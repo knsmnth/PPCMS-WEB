@@ -33,6 +33,9 @@ export default function SummaryWorkspace() {
   const { data: equipments } = useCollection('equipments');
   const { data: labor } = useCollection('laborTypes');
   
+  const { data: allSchedules } = useCollection('schedulesOfWork');
+  const scheduleContext = allSchedules.find(s => s.id === scheduleId);
+  
   const navigate = useNavigate();
   const [summaryName, setSummaryName] = useState('');
   const [summaryType, setSummaryType] = useState('material');
@@ -94,12 +97,25 @@ export default function SummaryWorkspace() {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
+  if (!scheduleId) {
+    return (
+      <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '1rem', color: 'var(--muted-foreground)' }}>
+        <Calculator size={48} style={{ opacity: 0.2 }} />
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)' }}>Context Required</h2>
+        <p>Please select a specific Phase Schedule to view its financial Summary Workspace.</p>
+        <Button onClick={() => navigate('/schedules')} variant="outline" style={{ marginTop: '1rem' }}>
+          Return to Schedules
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
         <div>
           <button 
-            onClick={() => navigate('/schedules')}
+            onClick={() => navigate(`/schedules${scheduleContext ? `?projectId=${scheduleContext.projectId}` : ''}`)}
             style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.8rem', cursor: 'pointer', marginBottom: '0.5rem', fontWeight: 600 }}
           >
             <ArrowLeft size={14} /> Back to Schedules

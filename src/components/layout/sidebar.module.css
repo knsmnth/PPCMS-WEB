@@ -69,6 +69,16 @@
   box-shadow: 0 4px 12px rgba(10, 28, 16, 0.15);
 }
 
+.link_disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.link_disabled:hover {
+  background-color: transparent;
+  color: #52525b;
+}
+
 .icon {
   width: 1.125rem;
   height: 1.125rem;

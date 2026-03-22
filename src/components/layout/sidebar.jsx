@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { 
   Building2, 
   Building, 
@@ -16,9 +16,12 @@ import clsx from 'clsx';
 import { useAuth } from '../../hooks/useAuth';
 import styles from './sidebar.module.css';
 
-const navItems = [
+const topLevelItems = [
   { name: 'Dashboard', path: '/', icon: LayoutDashboard },
   { name: 'Campuses', path: '/campuses', icon: Building2 },
+];
+
+const dependentItems = [
   { name: 'Facilities', path: '/facilities', icon: Building },
   { name: 'Projects', path: '/projects', icon: Folder },
   { name: 'Schedules of Work', path: '/schedules', icon: Calendar },
@@ -33,6 +36,7 @@ const masterDataItems = [
 
 export function Sidebar({ className }) {
   const { signOut, user } = useAuth();
+  const location = useLocation();
 
   return (
     <aside className={clsx(styles.sidebar, className)}>
@@ -45,7 +49,7 @@ export function Sidebar({ className }) {
       
       <nav className={styles.nav}>
         <div className={styles.sectionTitle}>Operations</div>
-        {navItems.map((item) => (
+        {topLevelItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
@@ -55,6 +59,19 @@ export function Sidebar({ className }) {
             {item.name}
           </NavLink>
         ))}
+        {dependentItems.map((item) => {
+          const active = location.pathname.startsWith(item.path);
+          return (
+            <div
+              key={item.path}
+              className={clsx(styles.link, active ? styles.link_active : styles.link_disabled)}
+              title={active ? '' : 'Please select a parent entity first to view this level.'}
+            >
+              <item.icon className={styles.icon} />
+              {item.name}
+            </div>
+          );
+        })}
 
         <div className={styles.sectionTitle}>Master Data</div>
         {masterDataItems.map((item) => (

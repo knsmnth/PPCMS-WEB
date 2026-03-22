@@ -53,8 +53,21 @@ export default function Facilities() {
     }
   };
 
+  if (!campusId) {
+    return (
+      <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '1rem', color: 'var(--muted-foreground)' }}>
+        <Building size={48} style={{ opacity: 0.2 }} />
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)' }}>Context Required</h2>
+        <p>Please select a specific Campus from the directory to view or manage its facilities.</p>
+        <Button onClick={() => navigate('/campuses')} variant="outline" style={{ marginTop: '1rem' }}>
+          Return to Campuses
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
         <div>
           {campusId && (

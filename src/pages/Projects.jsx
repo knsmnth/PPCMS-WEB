@@ -62,13 +62,26 @@ export default function Projects() {
     }
   };
 
+  if (!facilityId) {
+    return (
+      <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '1rem', color: 'var(--muted-foreground)' }}>
+        <Folder size={48} style={{ opacity: 0.2 }} />
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)' }}>Context Required</h2>
+        <p>Please select a specific Facility from the directory to view its associated projects.</p>
+        <Button onClick={() => navigate('/facilities')} variant="outline" style={{ marginTop: '1rem' }}>
+          Return to Facilities
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
         <div>
           {facilityId && (
             <button 
-              onClick={() => navigate('/facilities')}
+              onClick={() => navigate(`/facilities${facility ? `?campusId=${facility.campusId}` : ''}`)}
               style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.8rem', cursor: 'pointer', marginBottom: '0.5rem', fontWeight: 600 }}
             >
               <ArrowLeft size={14} /> Back to Facilities

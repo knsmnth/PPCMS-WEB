@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { cascadeCostUpdate } from '../lib/billing';
 import { cascadeDelete } from '../lib/cascade';
 import { SelectCombo } from '../components/ui/select-combo';
+import { Select } from '../components/ui/select';
 import { 
   Plus, 
   Trash2, 
@@ -146,16 +147,14 @@ export default function SummaryWorkspace() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Group Classification</label>
-                <SelectCombo 
+                <Select 
                   value={summaryType} 
-                  onChange={setSummaryType} 
-                  options={[
-                    { value: 'material', label: 'Material Assets' },
-                    { value: 'equipment', label: 'Equipment Operations' },
-                    { value: 'labor', label: 'Personnel & Labor' }
-                  ]}
-                  placeholder="Classification..."
-                />
+                  onChange={(e) => setSummaryType(e.target.value)}
+                >
+                  <option value="material">Material Assets</option>
+                  <option value="equipment">Equipment Operations</option>
+                  <option value="labor">Personnel & Labor</option>
+                </Select>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Category Title</label>
@@ -246,16 +245,14 @@ export default function SummaryWorkspace() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Group Classification</label>
-              <SelectCombo 
+              <Select 
                 value={editSummaryType} 
-                onChange={setEditSummaryType} 
-                options={[
-                  { value: 'material', label: 'Material Assets' },
-                  { value: 'equipment', label: 'Equipment Operations' },
-                  { value: 'labor', label: 'Personnel & Labor' }
-                ]}
-                placeholder="Classification..."
-              />
+                onChange={(e) => setEditSummaryType(e.target.value)}
+              >
+                <option value="material">Material Assets</option>
+                <option value="equipment">Equipment Operations</option>
+                <option value="labor">Personnel & Labor</option>
+              </Select>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Category Title</label>

@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCollection } from '../hooks/useData';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '../components/ui/dialog';
-import { Folder, Plus, ArrowRight, ArrowLeft, Edit2, Trash2 } from 'lucide-react';
+import { Folder, Plus, ArrowRight, ArrowLeft, Edit2, Trash2, Search } from 'lucide-react';
 import { cascadeDelete } from '../lib/cascade';
 import { SelectCombo } from '../components/ui/select-combo';
+import { Select } from '../components/ui/select';
+import { useVirtualizer } from '@tanstack/react-virtual';
 
 export default function Projects() {
   const [searchParams] = useSearchParams();
@@ -27,6 +29,28 @@ export default function Projects() {
   const [editingProject, setEditingProject] = useState(null);
   const [editName, setEditName] = useState('');
   const [editStatus, setEditStatus] = useState('');
+  
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredData = useMemo(() => {
+    return projects.filter(p => 
+      p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      (p.status && p.status.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+  }, [projects, searchQuery]);
+
+  const parentRef = useRef(null);
+  const rowVirtualizer = useVirtualizer({
+    count: filteredData.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 72,
+    overscan: 5,
+  });
+
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const totalSize = rowVirtualizer.getTotalSize();
+  const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
+  const paddingBottom = virtualRows.length > 0 ? totalSize - virtualRows[virtualRows.length - 1].end : 0;
 
   const handleCreate = async () => {
     if (!name || !selectedFacilityId) return;
@@ -94,53 +118,63 @@ export default function Projects() {
           <p style={{ color: 'var(--muted-foreground)', fontSize: '0.925rem', marginTop: '0.25rem' }}>Strategic operational projects focused on maintenance and expansion.</p>
         </div>
         
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus size={18} />
-              Initialize Project
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>New Project Specification</DialogTitle></DialogHeader>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Facility Context</label>
-                <SelectCombo 
-                  value={selectedFacilityId} 
-                  onChange={setSelectedFacilityId} 
-                  options={facilities.map(f => ({ value: f.id, label: f.name }))}
-                  placeholder="Select facility..."
-                  disabled={true}
-                />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'var(--background)', padding: '0 1rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', width: '300px', height: '2.5rem' }}>
+            <Search size={16} color="var(--muted-foreground)" />
+            <input 
+              type="text" 
+              placeholder="Search components..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', fontSize: '0.9rem', color: 'var(--foreground)' }}
+            />
+          </div>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus size={18} />
+                Initialize Project
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>New Project Specification</DialogTitle></DialogHeader>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Facility Context</label>
+                  <SelectCombo 
+                    value={selectedFacilityId} 
+                    onChange={setSelectedFacilityId} 
+                    options={facilities.map(f => ({ value: f.id, label: f.name }))}
+                    placeholder="Select facility..."
+                    disabled={true}
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Project Name</label>
+                  <Input placeholder="e.g. Roof Replacement 2024" value={name} onChange={(e) => setName(e.target.value)} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Operational Status</label>
+                  <Select 
+                    value={status} 
+                    onChange={(e) => setStatus(e.target.value)}
+                  >
+                    <option value="Planning">Planning Phase</option>
+                    <option value="Active">Operational / Active</option>
+                    <option value="Completed">Project Completed</option>
+                    <option value="On Hold">Strategically Paused</option>
+                  </Select>
+                </div>
+                <DialogClose asChild><Button onClick={handleCreate} disabled={!selectedFacilityId}>Create Project Instance</Button></DialogClose>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Project Name</label>
-                <Input placeholder="e.g. Roof Replacement 2024" value={name} onChange={(e) => setName(e.target.value)} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Operational Status</label>
-                <SelectCombo 
-                  value={status} 
-                  onChange={setStatus}
-                  options={[
-                    { value: "Planning", label: "Planning Phase" },
-                    { value: "Active", label: "Operational / Active" },
-                    { value: "Completed", label: "Project Completed" },
-                    { value: "On Hold", label: "Strategically Paused" }
-                  ]}
-                  placeholder="Select Status"
-                />
-              </div>
-              <DialogClose asChild><Button onClick={handleCreate} disabled={!selectedFacilityId}>Create Project Instance</Button></DialogClose>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        </div>
       </header>
 
-      <div style={{ borderRadius: 'var(--radius)', overflow: 'hidden' }}>
-        <Table>
-          <TableHeader>
+      <div ref={parentRef} style={{ maxHeight: '600px', overflow: 'auto', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+        <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
+          <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'var(--background)' }}>
             <TableRow>
               <TableHead>Project Definition</TableHead>
               <TableHead>Phase Status</TableHead>
@@ -149,10 +183,26 @@ export default function Projects() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {projects.map(p => {
+            {filteredData.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={4} style={{ textAlign: 'center', padding: '4.5rem', color: 'var(--muted-foreground)' }}>
+                  <Folder size={32} style={{ opacity: 0.15, marginBottom: '1.25rem' }} />
+                  <p>{searchQuery ? "No projects match your search." : "No projects found in this registry. Initialise a project instance to begin tracking."}</p>
+                </TableCell>
+              </TableRow>
+            )}
+
+            {paddingTop > 0 && (
+              <TableRow>
+                <TableCell colSpan={4} style={{ height: `${paddingTop}px`, padding: 0, border: 0 }} />
+              </TableRow>
+            )}
+
+            {virtualRows.map((virtualRow) => {
+              const p = filteredData[virtualRow.index];
               const statusColors = getStatusColor(p.status);
               return (
-              <TableRow key={p.id}>
+              <TableRow key={p.id} ref={rowVirtualizer.measureElement} data-index={virtualRow.index}>
                 <TableCell>
                   <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--primary)' }}>{p.name}</div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>Ref: {p.id.substring(0, 8)}...</div>
@@ -195,12 +245,10 @@ export default function Projects() {
                 </TableCell>
               </TableRow>
             )})}
-            {projects.length === 0 && (
+            
+            {paddingBottom > 0 && (
               <TableRow>
-                <TableCell colSpan={4} style={{ textAlign: 'center', padding: '4.5rem', color: 'var(--muted-foreground)' }}>
-                  <Folder size={32} style={{ opacity: 0.15, marginBottom: '1.25rem' }} />
-                  <p>No projects found in this registry. Initialise a project instance to begin tracking.</p>
-                </TableCell>
+                <TableCell colSpan={4} style={{ height: `${paddingBottom}px`, padding: 0, border: 0 }} />
               </TableRow>
             )}
           </TableBody>
@@ -217,17 +265,15 @@ export default function Projects() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Operational Status</label>
-              <SelectCombo 
+              <Select 
                 value={editStatus} 
-                onChange={setEditStatus}
-                options={[
-                  { value: "Planning", label: "Planning Phase" },
-                  { value: "Active", label: "Operational / Active" },
-                  { value: "Completed", label: "Project Completed" },
-                  { value: "On Hold", label: "Strategically Paused" }
-                ]}
-                placeholder="Select Status"
-              />
+                onChange={(e) => setEditStatus(e.target.value)}
+              >
+                <option value="Planning">Planning Phase</option>
+                <option value="Active">Operational / Active</option>
+                <option value="Completed">Project Completed</option>
+                <option value="On Hold">Strategically Paused</option>
+              </Select>
             </div>
             <Button onClick={handleEdit} style={{ marginTop: '0.5rem' }}>Save Changes</Button>
           </div>

@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCollection } from '../hooks/useData';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '../components/ui/dialog';
-import { MapPin, Plus, ArrowRight, Building2, Edit2, Trash2 } from 'lucide-react';
+import { MapPin, Plus, ArrowRight, Building2, Edit2, Trash2, Search } from 'lucide-react';
 import { cascadeDelete } from '../lib/cascade';
+import { useVirtualizer } from '@tanstack/react-virtual';
 
 export default function Campuses() {
   const { data: campuses, createItem, updateItem, refresh } = useCollection('campuses');
@@ -18,6 +19,28 @@ export default function Campuses() {
   const [editingCampus, setEditingCampus] = useState(null);
   const [editName, setEditName] = useState('');
   const [editLocation, setEditLocation] = useState('');
+  
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredData = useMemo(() => {
+    return campuses.filter(c => 
+      c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      (c.location && c.location.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+  }, [campuses, searchQuery]);
+
+  const parentRef = useRef(null);
+  const rowVirtualizer = useVirtualizer({
+    count: filteredData.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 72,
+    overscan: 5,
+  });
+
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const totalSize = rowVirtualizer.getTotalSize();
+  const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
+  const paddingBottom = virtualRows.length > 0 ? totalSize - virtualRows[virtualRows.length - 1].end : 0;
 
   const handleCreate = async () => {
     if (!name) return;
@@ -53,45 +76,57 @@ export default function Campuses() {
           <p style={{ color: 'var(--muted-foreground)', fontSize: '0.925rem', marginTop: '0.25rem' }}>Management and oversight of institutional regional campuses.</p>
         </div>
         
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button size="md">
-              <Plus size={18} />
-              Add Campus
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>New Campus</DialogTitle>
-            </DialogHeader>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Campus Name</label>
-                <Input placeholder="e.g. Northern Campus" value={name} onChange={(e) => setName(e.target.value)} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Address/Location</label>
-                <div style={{ position: 'relative' }}>
-                  <MapPin size={16} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted-foreground)' }} />
-                  <Input 
-                    style={{ paddingLeft: '2.5rem' }}
-                    placeholder="e.g. 123 University Drive" 
-                    value={location} 
-                    onChange={(e) => setLocation(e.target.value)} 
-                  />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'var(--background)', padding: '0 1rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', width: '300px', height: '2.5rem' }}>
+            <Search size={16} color="var(--muted-foreground)" />
+            <input 
+              type="text" 
+              placeholder="Search campuses by name or location..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', fontSize: '0.9rem', color: 'var(--foreground)' }}
+            />
+          </div>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button size="md">
+                <Plus size={18} />
+                Add Campus
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>New Campus</DialogTitle>
+              </DialogHeader>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Campus Name</label>
+                  <Input placeholder="e.g. Northern Campus" value={name} onChange={(e) => setName(e.target.value)} />
                 </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Address/Location</label>
+                  <div style={{ position: 'relative' }}>
+                    <MapPin size={16} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted-foreground)' }} />
+                    <Input 
+                      style={{ paddingLeft: '2.5rem' }}
+                      placeholder="e.g. 123 University Drive" 
+                      value={location} 
+                      onChange={(e) => setLocation(e.target.value)} 
+                    />
+                  </div>
+                </div>
+                <DialogClose asChild>
+                  <Button onClick={handleCreate} style={{ marginTop: '0.5rem' }}>Register Campus</Button>
+                </DialogClose>
               </div>
-              <DialogClose asChild>
-                <Button onClick={handleCreate} style={{ marginTop: '0.5rem' }}>Register Campus</Button>
-              </DialogClose>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        </div>
       </header>
 
-      <div style={{ borderRadius: 'var(--radius)', overflow: 'hidden' }}>
-        <Table>
-          <TableHeader>
+      <div ref={parentRef} style={{ maxHeight: '600px', overflow: 'auto', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+        <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
+          <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'var(--background)' }}>
             <TableRow>
               <TableHead>Campus Information</TableHead>
               <TableHead>Location</TableHead>
@@ -100,8 +135,25 @@ export default function Campuses() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {campuses.map(c => (
-              <TableRow key={c.id}>
+            {filteredData.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={4} style={{ textAlign: 'center', padding: '4.5rem', color: 'var(--muted-foreground)' }}>
+                  <Building2 size={32} style={{ opacity: 0.2, marginBottom: '1rem' }} />
+                  <p>{searchQuery ? "No campuses match your search." : "No campuses registered yet. Get started by adding your first institutional location."}</p>
+                </TableCell>
+              </TableRow>
+            )}
+
+            {paddingTop > 0 && (
+              <TableRow>
+                <TableCell colSpan={4} style={{ height: `${paddingTop}px`, padding: 0, border: 0 }} />
+              </TableRow>
+            )}
+
+            {virtualRows.map((virtualRow) => {
+              const c = filteredData[virtualRow.index];
+              return (
+              <TableRow key={c.id} ref={rowVirtualizer.measureElement} data-index={virtualRow.index}>
                 <TableCell>
                   <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--primary)' }}>{c.name}</div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>ID: {c.id.substring(0, 8)}...</div>
@@ -143,13 +195,11 @@ export default function Campuses() {
                   </button>
                 </TableCell>
               </TableRow>
-            ))}
-            {campuses.length === 0 && (
+            )})}
+            
+            {paddingBottom > 0 && (
               <TableRow>
-                <TableCell colSpan={4} style={{ textAlign: 'center', padding: '4rem', color: 'var(--muted-foreground)' }}>
-                  <Building2 size={32} style={{ opacity: 0.2, marginBottom: '1rem' }} />
-                  <p>No campuses registered yet. Get started by adding your first institutional location.</p>
-                </TableCell>
+                <TableCell colSpan={4} style={{ height: `${paddingBottom}px`, padding: 0, border: 0 }} />
               </TableRow>
             )}
           </TableBody>

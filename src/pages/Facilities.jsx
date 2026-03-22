@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCollection } from '../hooks/useData';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '../components/ui/dialog';
-import { Building, Plus, ArrowRight, ArrowLeft, Edit2, Trash2 } from 'lucide-react';
+import { Building, Plus, ArrowRight, ArrowLeft, Edit2, Trash2, Search } from 'lucide-react';
 import { cascadeDelete } from '../lib/cascade';
 import { SelectCombo } from '../components/ui/select-combo';
+import { useVirtualizer } from '@tanstack/react-virtual';
 
 export default function Facilities() {
   const [searchParams] = useSearchParams();
@@ -27,6 +28,28 @@ export default function Facilities() {
   const [editingFacility, setEditingFacility] = useState(null);
   const [editName, setEditName] = useState('');
   const [editType, setEditType] = useState('');
+  
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredData = useMemo(() => {
+    return facilities.filter(f => 
+      f.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      (f.type && f.type.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+  }, [facilities, searchQuery]);
+
+  const parentRef = useRef(null);
+  const rowVirtualizer = useVirtualizer({
+    count: filteredData.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 72,
+    overscan: 5,
+  });
+
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const totalSize = rowVirtualizer.getTotalSize();
+  const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
+  const paddingBottom = virtualRows.length > 0 ? totalSize - virtualRows[virtualRows.length - 1].end : 0;
 
   const handleCreate = async () => {
     if (!name || !selectedCampusId) return;
@@ -85,45 +108,57 @@ export default function Facilities() {
           <p style={{ color: 'var(--muted-foreground)', fontSize: '0.925rem', marginTop: '0.25rem' }}>Management of individual assets and infrastructure components.</p>
         </div>
         
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus size={18} />
-              Add Facility
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>New Facility</DialogTitle></DialogHeader>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Campus Assignment</label>
-                <SelectCombo 
-                  value={selectedCampusId} 
-                  onChange={setSelectedCampusId}
-                  options={campuses.map(c => ({ value: c.id, label: c.name }))}
-                  placeholder="Select a campus..."
-                  disabled={true}
-                />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'var(--background)', padding: '0 1rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', width: '300px', height: '2.5rem' }}>
+            <Search size={16} color="var(--muted-foreground)" />
+            <input 
+              type="text" 
+              placeholder="Search facilities..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', fontSize: '0.9rem', color: 'var(--foreground)' }}
+            />
+          </div>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus size={18} />
+                Add Facility
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>New Facility</DialogTitle></DialogHeader>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Campus Assignment</label>
+                  <SelectCombo 
+                    value={selectedCampusId} 
+                    onChange={setSelectedCampusId}
+                    options={campuses.map(c => ({ value: c.id, label: c.name }))}
+                    placeholder="Select a campus..."
+                    disabled={true}
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Facility Name</label>
+                  <Input placeholder="e.g. Science Laboratory" value={name} onChange={(e) => setName(e.target.value)} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Facility Category</label>
+                  <Input placeholder="e.g. Academic, Maintenance" value={type} onChange={(e) => setType(e.target.value)} />
+                </div>
+                <DialogClose asChild>
+                  <Button onClick={handleCreate} disabled={!selectedCampusId}>Register Facility</Button>
+                </DialogClose>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Facility Name</label>
-                <Input placeholder="e.g. Science Laboratory" value={name} onChange={(e) => setName(e.target.value)} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Facility Category</label>
-                <Input placeholder="e.g. Academic, Maintenance" value={type} onChange={(e) => setType(e.target.value)} />
-              </div>
-              <DialogClose asChild>
-                <Button onClick={handleCreate} disabled={!selectedCampusId}>Register Facility</Button>
-              </DialogClose>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        </div>
       </header>
 
-      <div style={{ borderRadius: 'var(--radius)', overflow: 'hidden' }}>
-        <Table>
-          <TableHeader>
+      <div ref={parentRef} style={{ maxHeight: '600px', overflow: 'auto', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+        <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
+          <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'var(--background)' }}>
             <TableRow>
               <TableHead>Facility Identity</TableHead>
               <TableHead>Classification</TableHead>
@@ -132,8 +167,25 @@ export default function Facilities() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {facilities.map(f => (
-              <TableRow key={f.id}>
+            {filteredData.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={4} style={{ textAlign: 'center', padding: '4rem', color: 'var(--muted-foreground)' }}>
+                  <Building size={32} style={{ opacity: 0.2, marginBottom: '1rem' }} />
+                  <p>{searchQuery ? "No facilities match your search." : "No facilities identified. Registered structures will appear here."}</p>
+                </TableCell>
+              </TableRow>
+            )}
+
+            {paddingTop > 0 && (
+              <TableRow>
+                <TableCell colSpan={4} style={{ height: `${paddingTop}px`, padding: 0, border: 0 }} />
+              </TableRow>
+            )}
+
+            {virtualRows.map((virtualRow) => {
+              const f = filteredData[virtualRow.index];
+              return (
+              <TableRow key={f.id} ref={rowVirtualizer.measureElement} data-index={virtualRow.index}>
                 <TableCell>
                   <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--primary)' }}>{f.name}</div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>UID: {f.id.substring(0, 8)}...</div>
@@ -174,13 +226,11 @@ export default function Facilities() {
                   </button>
                 </TableCell>
               </TableRow>
-            ))}
-            {facilities.length === 0 && (
+            )})}
+            
+            {paddingBottom > 0 && (
               <TableRow>
-                <TableCell colSpan={4} style={{ textAlign: 'center', padding: '4rem', color: 'var(--muted-foreground)' }}>
-                  <Building size={32} style={{ opacity: 0.2, marginBottom: '1rem' }} />
-                  <p>No facilities identified. Registered structures will appear here.</p>
-                </TableCell>
+                <TableCell colSpan={4} style={{ height: `${paddingBottom}px`, padding: 0, border: 0 }} />
               </TableRow>
             )}
           </TableBody>

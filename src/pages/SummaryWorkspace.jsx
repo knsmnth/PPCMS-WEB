@@ -226,7 +226,7 @@ export default function SummaryWorkspace() {
               </div>
             </div>
             
-            <Table style={{ border: 'none', boxShadow: 'none' }}>
+            <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
               <TableHeader>
                 <TableRow>
                   <TableHead>Specification & Asset</TableHead>

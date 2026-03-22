@@ -2,8 +2,8 @@ import React from "react";
 import clsx from "clsx";
 import styles from "./table.module.css";
 
-const Table = React.forwardRef(({ className, wrapperClassName, ...props }, ref) => (
-  <div className={clsx(styles.container, wrapperClassName)}>
+const Table = React.forwardRef(({ className, wrapperClassName, wrapperStyle, ...props }, ref) => (
+  <div className={clsx(styles.container, wrapperClassName)} style={wrapperStyle}>
     <table ref={ref} className={clsx(styles.table, className)} {...props} />
   </div>
 ));

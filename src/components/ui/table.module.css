@@ -1,0 +1,68 @@
+.container {
+  position: relative;
+  width: 100%;
+  overflow-x: auto;
+  border-radius: var(--radius);
+  background-color: var(--background);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+}
+
+.table {
+  width: 100%;
+  caption-side: bottom;
+  font-size: 0.875rem;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.header {
+  border-bottom: 2px solid var(--border);
+  background-color: #fafafa;
+}
+
+.body > tr:last-child {
+  border-bottom: 0;
+}
+
+.footer {
+  border-top: 1px solid var(--border);
+  background-color: var(--muted);
+  font-weight: 600;
+}
+
+.row {
+  border-bottom: 1px solid var(--border);
+  transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.row:hover {
+  background-color: #f8fafc; /* Slate 50 */
+}
+
+.row_selected {
+  background-color: var(--muted);
+}
+
+.head {
+  height: 3rem;
+  padding: 0 1rem;
+  vertical-align: middle;
+  font-weight: 700;
+  color: var(--foreground);
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+}
+
+.cell {
+  padding: 1rem;
+  vertical-align: middle;
+  color: #3f3f46; /* Zinc 700 */
+}
+
+.caption {
+  margin-top: 1rem;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}

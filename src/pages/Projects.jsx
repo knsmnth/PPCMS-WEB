@@ -7,6 +7,7 @@ import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '../components/ui/dialog';
 import { Folder, Plus, ArrowRight, ArrowLeft, Edit2, Trash2 } from 'lucide-react';
 import { cascadeDelete } from '../lib/cascade';
+import { SelectCombo } from '../components/ui/select-combo';
 
 export default function Projects() {
   const [searchParams] = useSearchParams();
@@ -105,14 +106,12 @@ export default function Projects() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Facility Context</label>
-                <select 
+                <SelectCombo 
                   value={selectedFacilityId} 
-                  onChange={(e) => setSelectedFacilityId(e.target.value)} 
-                  style={{ height: '2.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', padding: '0.75rem', fontSize: '0.875rem', outline: 'none', backgroundColor: '#fff' }}
-                >
-                  <option value="">Select facility...</option>
-                  {facilities.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-                </select>
+                  onChange={setSelectedFacilityId} 
+                  options={facilities.map(f => ({ value: f.id, label: f.name }))}
+                  placeholder="Select facility..."
+                />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Project Name</label>
@@ -120,16 +119,17 @@ export default function Projects() {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Operational Status</label>
-                <select 
+                <SelectCombo 
                   value={status} 
-                  onChange={(e) => setStatus(e.target.value)}
-                  style={{ height: '2.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', padding: '0.75rem', fontSize: '0.875rem', outline: 'none', backgroundColor: '#fff' }}
-                >
-                  <option value="Planning">Planning Phase</option>
-                  <option value="Active">Operational / Active</option>
-                  <option value="Completed">Project Completed</option>
-                  <option value="On Hold">Strategically Paused</option>
-                </select>
+                  onChange={setStatus}
+                  options={[
+                    { value: "Planning", label: "Planning Phase" },
+                    { value: "Active", label: "Operational / Active" },
+                    { value: "Completed", label: "Project Completed" },
+                    { value: "On Hold", label: "Strategically Paused" }
+                  ]}
+                  placeholder="Select Status"
+                />
               </div>
               <DialogClose asChild><Button onClick={handleCreate} disabled={!selectedFacilityId}>Create Project Instance</Button></DialogClose>
             </div>
@@ -216,16 +216,17 @@ export default function Projects() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Operational Status</label>
-              <select 
+              <SelectCombo 
                 value={editStatus} 
-                onChange={(e) => setEditStatus(e.target.value)}
-                style={{ height: '2.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', padding: '0.75rem', fontSize: '0.875rem', outline: 'none', backgroundColor: '#fff' }}
-              >
-                <option value="Planning">Planning Phase</option>
-                <option value="Active">Operational / Active</option>
-                <option value="Completed">Project Completed</option>
-                <option value="On Hold">Strategically Paused</option>
-              </select>
+                onChange={setEditStatus}
+                options={[
+                  { value: "Planning", label: "Planning Phase" },
+                  { value: "Active", label: "Operational / Active" },
+                  { value: "Completed", label: "Project Completed" },
+                  { value: "On Hold", label: "Strategically Paused" }
+                ]}
+                placeholder="Select Status"
+              />
             </div>
             <Button onClick={handleEdit} style={{ marginTop: '0.5rem' }}>Save Changes</Button>
           </div>

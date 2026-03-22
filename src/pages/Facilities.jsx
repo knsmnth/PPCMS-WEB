@@ -7,6 +7,7 @@ import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '../components/ui/dialog';
 import { Building, Plus, ArrowRight, ArrowLeft, Edit2, Trash2 } from 'lucide-react';
 import { cascadeDelete } from '../lib/cascade';
+import { SelectCombo } from '../components/ui/select-combo';
 
 export default function Facilities() {
   const [searchParams] = useSearchParams();
@@ -96,14 +97,12 @@ export default function Facilities() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Campus Assignment</label>
-                <select 
+                <SelectCombo 
                   value={selectedCampusId} 
-                  onChange={(e) => setSelectedCampusId(e.target.value)}
-                  style={{ height: '2.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', padding: '1rem', fontSize: '0.875rem', outline: 'none', flex: 1, backgroundColor: '#fff' }}
-                >
-                  <option value="">Select a campus...</option>
-                  {campuses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+                  onChange={setSelectedCampusId}
+                  options={campuses.map(c => ({ value: c.id, label: c.name }))}
+                  placeholder="Select a campus..."
+                />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Facility Name</label>

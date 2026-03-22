@@ -7,6 +7,7 @@ import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '../components/ui/dialog';
 import { Calendar, Plus, ArrowRight, ArrowLeft, Clock, Edit2, Trash2 } from 'lucide-react';
 import { cascadeDelete } from '../lib/cascade';
+import { SelectCombo } from '../components/ui/select-combo';
 
 export default function Schedules() {
   const [searchParams] = useSearchParams();
@@ -96,14 +97,12 @@ export default function Schedules() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Project Link</label>
-                <select 
+                <SelectCombo 
                   value={selectedProjectId} 
-                  onChange={(e) => setSelectedProjectId(e.target.value)} 
-                  style={{ height: '2.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', padding: '0.75rem', fontSize: '0.875rem', outline: 'none', backgroundColor: '#fff' }}
-                >
-                  <option value="">Select project...</option>
-                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
+                  onChange={setSelectedProjectId} 
+                  options={projects.map(p => ({ value: p.id, label: p.name }))}
+                  placeholder="Select project..."
+                />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Schedule Identifier</label>

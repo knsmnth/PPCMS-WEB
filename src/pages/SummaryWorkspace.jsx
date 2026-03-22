@@ -7,6 +7,7 @@ import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '../components/ui/dialog';
 import { cascadeCostUpdate } from '../lib/billing';
 import { cascadeDelete } from '../lib/cascade';
+import { SelectCombo } from '../components/ui/select-combo';
 import { 
   Plus, 
   Trash2, 
@@ -73,16 +74,24 @@ export default function SummaryWorkspace() {
     }
   };
 
-  const MasterDataSelector = ({ type, onSelect }) => {
+  const MasterDataSelector = ({ type, onSelect, selectedId }) => {
     const list = type === 'material' ? materials : type === 'equipment' ? equipments : labor;
+    const options = list.map(i => ({
+      value: i.id,
+      label: `${i.name} - ₱${(Number(i.currentPrice) || Number(i.currentRate) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+    }));
+
     return (
-      <select 
-        onChange={(e) => onSelect(list.find(i => i.id === e.target.value))} 
-        style={{ height: '2.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', padding: '0 0.75rem', fontSize: '0.85rem', flex: 1, backgroundColor: '#fff' }}
-      >
-        <option value="">Select an Item...</option>
-        {list.map(i => <option key={i.id} value={i.id}>{i.name} - ₱{(i.currentPrice || i.currentRate).toLocaleString()}</option>)}
-      </select>
+      <div style={{ flex: 1, minWidth: '300px' }}>
+        <SelectCombo 
+          options={options}
+          value={selectedId}
+          onChange={(val) => {
+            onSelect(list.find(i => i.id === val) || null);
+          }}
+          placeholder="Search and attach specification..."
+        />
+      </div>
     );
   };
 
@@ -136,15 +145,16 @@ export default function SummaryWorkspace() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Group Classification</label>
-                <select 
+                <SelectCombo 
                   value={summaryType} 
-                  onChange={(e) => setSummaryType(e.target.value)} 
-                  style={{ height: '2.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', padding: '0.75rem', fontSize: '0.875rem', outline: 'none', backgroundColor: '#fff' }}
-                >
-                  <option value="material">Material Assets</option>
-                  <option value="equipment">Equipment Operations</option>
-                  <option value="labor">Personnel & Labor</option>
-                </select>
+                  onChange={setSummaryType} 
+                  options={[
+                    { value: 'material', label: 'Material Assets' },
+                    { value: 'equipment', label: 'Equipment Operations' },
+                    { value: 'labor', label: 'Personnel & Labor' }
+                  ]}
+                  placeholder="Classification..."
+                />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Category Title</label>
@@ -170,7 +180,7 @@ export default function SummaryWorkspace() {
         const groupItems = items.filter(i => i.summaryId === summary.id);
         
         return (
-          <div key={summary.id} className="animate-fade-in" style={{ backgroundColor: 'var(--background)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', overflow: 'hidden' }}>
+          <div key={summary.id} className="animate-fade-in" style={{ backgroundColor: 'var(--background)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)', overflow: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem 1.5rem', borderBottom: '2px solid var(--border)', backgroundColor: '#fafafa' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <div style={{ padding: '0.625rem', backgroundColor: 'var(--secondary)', borderRadius: '0.5rem', color: 'var(--primary)' }}>
@@ -295,15 +305,16 @@ export default function SummaryWorkspace() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Group Classification</label>
-              <select 
+              <SelectCombo 
                 value={editSummaryType} 
-                onChange={(e) => setEditSummaryType(e.target.value)} 
-                style={{ height: '2.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', padding: '0.75rem', fontSize: '0.875rem', outline: 'none', backgroundColor: '#fff' }}
-              >
-                <option value="material">Material Assets</option>
-                <option value="equipment">Equipment Operations</option>
-                <option value="labor">Personnel & Labor</option>
-              </select>
+                onChange={setEditSummaryType} 
+                options={[
+                  { value: 'material', label: 'Material Assets' },
+                  { value: 'equipment', label: 'Equipment Operations' },
+                  { value: 'labor', label: 'Personnel & Labor' }
+                ]}
+                placeholder="Classification..."
+              />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Category Title</label>
@@ -322,10 +333,10 @@ function AddItemForm({ summary, onAdd, MasterDataSelector }) {
   const [qty, setQty] = useState('');
 
   return (
-    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', backgroundColor: '#f9fafb', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', backgroundColor: 'transparent', padding: '0.5rem 0 0 0', borderTop: '1px dashed var(--border)' }}>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
         <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)' }}>SELECT ASSET</span>
-        <MasterDataSelector type={summary.type} onSelect={setSelected} />
+        <MasterDataSelector type={summary.type} onSelect={setSelected} selectedId={selected?.id || ''} />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
         <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)' }}>QTY</span>

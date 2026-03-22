@@ -4,7 +4,7 @@
   overflow-x: auto;
   border-radius: var(--radius);
   background-color: var(--background);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow);
   border: 1px solid var(--border);
 }
 

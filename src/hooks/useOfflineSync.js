@@ -12,28 +12,48 @@ export function useOfflineSync() {
         const queue = await getSyncQueue();
         if (!queue || queue.length === 0) return;
 
+        // Offline Sync Processor - Bypassing 500-document batch limit
         console.log(`[Offline Sync] Pushing ${queue.length} items to Firebase...`);
-        const batch = writeBatch(db);
         
-        // Loop through all pending operations
+        const MAX_BATCH_SIZE = 500;
+        const batches = [];
+        let currentBatch = writeBatch(db);
+        let operationCount = 0;
+
+        // Loop through all pending operations and chunk them
         for (const operation of queue) {
           const docRef = doc(db, operation.collection, operation.payload.id);
+          
           if (operation.type === 'create' || operation.type === 'update') {
-            batch.set(docRef, operation.payload, { merge: true });
+            currentBatch.set(docRef, operation.payload, { merge: true });
           } else if (operation.type === 'delete') {
-            batch.delete(docRef);
+            currentBatch.delete(docRef);
+          }
+          
+          operationCount++;
+          
+          // If we hit 500, push the batch and start a new one
+          if (operationCount === MAX_BATCH_SIZE) {
+            batches.push(currentBatch);
+            currentBatch = writeBatch(db);
+            operationCount = 0;
           }
         }
         
-        // Commit the batch to Firebase
-        await batch.commit();
+        // Push any remaining operations
+        if (operationCount > 0) {
+          batches.push(currentBatch);
+        }
+        
+        // Commit all batches in parallel
+        await Promise.all(batches.map(b => b.commit()));
         
         // If successful, clear the processed items from IndexedDB SyncQueue
+        // (Removing sequentially is fine for IndexedDB, it is fast locally)
         for (const operation of queue) {
-          // In db.js we set syncQueue to autoIncrement its ID
           await removeFromSyncQueue(operation.id);
         }
-        console.log('[Offline Sync] Sync successful');
+        console.log('[Offline Sync] Sync successful across', batches.length, 'batch(es)');
       } catch (error) {
         console.error('[Offline Sync] Background sync failed:', error);
       }

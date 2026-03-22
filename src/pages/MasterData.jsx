@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useCollection } from '../hooks/useData';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -69,7 +70,7 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
         <div>
           <h1 style={{ fontSize: '1.875rem', fontWeight: 800, color: 'var(--primary)', letterSpacing: '-0.03em' }}>{title}</h1>
@@ -110,61 +111,17 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
       </header>
 
       <div style={{ borderRadius: 'var(--radius)', overflow: 'hidden' }}>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {fields.map(f => <TableHead key={f.name}>{f.label}</TableHead>)}
-              <TableHead></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredData.map(item => (
-              <TableRow key={item.id}>
-                {fields.map(f => (
-                  <TableCell key={f.name}>
-                    {f.name === 'currentPrice' || f.name === 'currentRate' 
-                      ? <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>₱{(item[f.name] || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                      : f.name === 'name' ? <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{item[f.name]}</span>
-                      : item[f.name]}
-                  </TableCell>
-                ))}
-                <TableCell style={{ textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                  <button 
-                    onClick={() => { setSelectedItem(item); setUpdateDialogOpen(true); }}
-                    style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.5rem' }}
-                    title="Update Price"
-                  >
-                    <Edit2 size={16} />
-                  </button>
-                  <button 
-                    onClick={() => { setHistoryItem(item); setHistoryDialogOpen(true); }}
-                    style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.5rem' }}
-                    title="Price History"
-                  >
-                    <History size={16} />
-                  </button>
-                  <button 
-                    onClick={() => deleteItem(item.id)}
-                    style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.5rem' }}
-                    onMouseOver={(e) => e.currentTarget.style.color = 'var(--destructive)'}
-                    onMouseOut={(e) => e.currentTarget.style.color = '#a1a1aa'}
-                    title="Delete Record"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </TableCell>
-              </TableRow>
-            ))}
-            {filteredData.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={fields.length + 1} style={{ textAlign: 'center', padding: '4.5rem', color: 'var(--muted-foreground)' }}>
-                  <Icon size={32} style={{ opacity: 0.1, marginBottom: '1rem' }} />
-                  <p>No records identified in the {title}. Add new entries to populate the registry.</p>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+        <VirtualizedMasterDataTable 
+          filteredData={filteredData} 
+          fields={fields} 
+          title={title} 
+          Icon={Icon} 
+          setSelectedItem={setSelectedItem} 
+          setUpdateDialogOpen={setUpdateDialogOpen} 
+          setHistoryItem={setHistoryItem} 
+          setHistoryDialogOpen={setHistoryDialogOpen} 
+          deleteItem={deleteItem} 
+        />
       </div>
 
       {/* Update Price Dialog */}
@@ -241,4 +198,101 @@ export function LaborManager() {
     { name: 'name', label: 'Personnel Role' },
     { name: 'currentRate', label: 'Standard Rate (₱)', type: 'number' }
   ]} />;
+}
+
+export function VirtualizedMasterDataTable({ filteredData, fields, title, Icon, setSelectedItem, setUpdateDialogOpen, setHistoryItem, setHistoryDialogOpen, deleteItem }) {
+  const parentRef = React.useRef(null);
+
+  const rowVirtualizer = useVirtualizer({
+    count: filteredData.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 50, // estimated row height in px
+    overscan: 5,
+  });
+
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const totalSize = rowVirtualizer.getTotalSize();
+
+  const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
+  const paddingBottom = virtualRows.length > 0 ? totalSize - virtualRows[virtualRows.length - 1].end : 0;
+
+  return (
+    <div ref={parentRef} style={{ maxHeight: '600px', overflow: 'auto', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+      <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
+        <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'var(--background)' }}>
+          <TableRow>
+            {fields.map(f => <TableHead key={f.name}>{f.label}</TableHead>)}
+            <TableHead></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredData.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={fields.length + 1} style={{ textAlign: 'center', padding: '4.5rem', color: 'var(--muted-foreground)' }}>
+                <Icon size={32} style={{ opacity: 0.1, marginBottom: '1rem' }} />
+                <p>No records identified in the {title}. Add new entries to populate the registry.</p>
+              </TableCell>
+            </TableRow>
+          )}
+
+          {paddingTop > 0 && (
+            <TableRow>
+              <TableCell colSpan={fields.length + 1} style={{ height: `${paddingTop}px`, padding: 0, border: 0 }} />
+            </TableRow>
+          )}
+
+          {virtualRows.map((virtualRow) => {
+            const item = filteredData[virtualRow.index];
+            return (
+              <TableRow 
+                key={item.id} 
+                ref={rowVirtualizer.measureElement}
+                data-index={virtualRow.index}
+              >
+                {fields.map(f => (
+                  <TableCell key={f.name}>
+                    {f.name === 'currentPrice' || f.name === 'currentRate' 
+                      ? <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>₱{(item[f.name] || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      : f.name === 'name' ? <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{item[f.name]}</span>
+                      : item[f.name]}
+                  </TableCell>
+                ))}
+                <TableCell style={{ textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                  <button 
+                    onClick={() => { setSelectedItem(item); setUpdateDialogOpen(true); }}
+                    style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.5rem' }}
+                    title="Update Price"
+                  >
+                    <Edit2 size={16} />
+                  </button>
+                  <button 
+                    onClick={() => { setHistoryItem(item); setHistoryDialogOpen(true); }}
+                    style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.5rem' }}
+                    title="Price History"
+                  >
+                    <History size={16} />
+                  </button>
+                  <button 
+                    onClick={() => deleteItem(item.id)}
+                    style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.5rem' }}
+                    onMouseOver={(e) => e.currentTarget.style.color = 'var(--destructive)'}
+                    onMouseOut={(e) => e.currentTarget.style.color = '#a1a1aa'}
+                    title="Delete Record"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+          
+          {paddingBottom > 0 && (
+            <TableRow>
+              <TableCell colSpan={fields.length + 1} style={{ height: `${paddingBottom}px`, padding: 0, border: 0 }} />
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
 }

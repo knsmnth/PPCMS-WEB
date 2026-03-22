@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useCollection } from '../hooks/useData';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
@@ -226,74 +227,14 @@ export default function SummaryWorkspace() {
               </div>
             </div>
             
-            <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Specification & Asset</TableHead>
-                  <TableHead style={{ textAlign: 'center' }}>Qty</TableHead>
-                  <TableHead style={{ textAlign: 'right' }}>Unit Rate</TableHead>
-                  <TableHead style={{ textAlign: 'right' }}>Line Extension</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {groupItems.map(item => (
-                  <TableRow key={item.id}>
-                    <TableCell>
-                      <div style={{ fontWeight: 700, color: 'var(--foreground)' }}>{item.name}</div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)' }}>PID: {item.id.substring(0, 8)}</div>
-                    </TableCell>
-                    <TableCell style={{ textAlign: 'center', fontWeight: 600 }}>{item.quantity}</TableCell>
-                    <TableCell style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>₱{item.unitCostAtTimeOfAdding.toLocaleString()}</TableCell>
-                    <TableCell style={{ textAlign: 'right', fontWeight: 800, color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>
-                       ₱{item.totalCost.toLocaleString()}
-                    </TableCell>
-                    <TableCell style={{ textAlign: 'right' }}>
-                      <button 
-                        onClick={async () => {
-                          await deleteSummaryItem(item.id);
-                          await cascadeCostUpdate(-item.totalCost, summary.id);
-                        }}
-                        style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.5rem', transition: 'all 0.2s' }}
-                        onMouseOver={(e) => e.currentTarget.style.color = 'var(--destructive)'}
-                        onMouseOut={(e) => e.currentTarget.style.color = '#a1a1aa'}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                
-                <TableRow>
-                  <TableCell colSpan={5} style={{ padding: '1.25rem' }}>
-                    <AddItemForm 
-                      summary={summary} 
-                      onAdd={async (selectedMasterItem, qty) => {
-                        if (!selectedMasterItem || !qty) return;
-                        const unitCost = Number(selectedMasterItem.currentPrice || selectedMasterItem.currentRate || 0);
-                        const quantity = Number(qty);
-                        const totalCost = unitCost * quantity;
-                        
-                        const newItem = {
-                          id: crypto.randomUUID(),
-                          summaryId: summary.id,
-                          referenceId: selectedMasterItem.id,
-                          name: selectedMasterItem.name,
-                          quantity,
-                          unitCostAtTimeOfAdding: unitCost,
-                          totalCost,
-                          createdAt: new Date().toISOString()
-                        };
-                        
-                        await createSummaryItem(newItem);
-                        await cascadeCostUpdate(totalCost, summary.id);
-                      }} 
-                      MasterDataSelector={MasterDataSelector} 
-                    />
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
+            <VirtualizedSummaryTable 
+              summary={summary} 
+              groupItems={groupItems} 
+              deleteSummaryItem={deleteSummaryItem} 
+              createSummaryItem={createSummaryItem}
+              cascadeCostUpdate={cascadeCostUpdate}
+              MasterDataSelector={MasterDataSelector}
+            />
           </div>
         );
       })}
@@ -346,6 +287,116 @@ function AddItemForm({ summary, onAdd, MasterDataSelector }) {
         <Button size="md" onClick={() => { onAdd(selected, qty); setSelected(null); setQty(''); }} disabled={!selected || !qty}>
           Add to Ledger
         </Button>
+      </div>
+    </div>
+  );
+}
+
+export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem, createSummaryItem, cascadeCostUpdate, MasterDataSelector }) {
+  const parentRef = React.useRef(null);
+
+  const rowVirtualizer = useVirtualizer({
+    count: groupItems.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 64, // estimated row height in px
+    overscan: 5,
+  });
+
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const totalSize = rowVirtualizer.getTotalSize();
+
+  const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
+  const paddingBottom = virtualRows.length > 0 ? totalSize - virtualRows[virtualRows.length - 1].end : 0;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <div ref={parentRef} style={{ maxHeight: '500px', overflow: 'auto', borderTop: '1px solid var(--border)' }}>
+        <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
+          <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'var(--background)' }}>
+            <TableRow>
+              <TableHead>Specification & Asset</TableHead>
+              <TableHead style={{ textAlign: 'center' }}>Qty</TableHead>
+              <TableHead style={{ textAlign: 'right' }}>Unit Rate</TableHead>
+              <TableHead style={{ textAlign: 'right' }}>Line Extension</TableHead>
+              <TableHead></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {paddingTop > 0 && (
+              <TableRow>
+                <TableCell colSpan={5} style={{ height: `${paddingTop}px`, padding: 0, border: 0 }} />
+              </TableRow>
+            )}
+
+            {virtualRows.map((virtualRow) => {
+              const item = groupItems[virtualRow.index];
+              return (
+                <TableRow 
+                  key={item.id} 
+                  ref={rowVirtualizer.measureElement}
+                  data-index={virtualRow.index}
+                >
+                  <TableCell>
+                    <div style={{ fontWeight: 700, color: 'var(--foreground)' }}>{item.name}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)' }}>PID: {item.id.substring(0, 8)}</div>
+                  </TableCell>
+                  <TableCell style={{ textAlign: 'center', fontWeight: 600 }}>{item.quantity}</TableCell>
+                  <TableCell style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>₱{item.unitCostAtTimeOfAdding.toLocaleString()}</TableCell>
+                  <TableCell style={{ textAlign: 'right', fontWeight: 800, color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>
+                     ₱{item.totalCost.toLocaleString()}
+                  </TableCell>
+                  <TableCell style={{ textAlign: 'right' }}>
+                    <button 
+                      onClick={async () => {
+                        await deleteSummaryItem(item.id);
+                        await cascadeCostUpdate(-item.totalCost, summary.id);
+                      }}
+                      style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.5rem', transition: 'all 0.2s' }}
+                      onMouseOver={(e) => e.currentTarget.style.color = 'var(--destructive)'}
+                      onMouseOut={(e) => e.currentTarget.style.color = '#a1a1aa'}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+            
+            {paddingBottom > 0 && (
+              <TableRow>
+                <TableCell colSpan={5} style={{ height: `${paddingBottom}px`, padding: 0, border: 0 }} />
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      
+      {/* Footer Form row rendered normally below the virtualized table body */}
+      <div style={{ borderTop: '1px solid var(--border)', padding: '1.25rem', backgroundColor: 'var(--background)' }}>
+        <AddItemForm 
+          summary={summary} 
+          onAdd={async (selectedMasterItem, qty) => {
+            if (!selectedMasterItem || !qty) return;
+            const unitCost = Number(selectedMasterItem.currentPrice || selectedMasterItem.currentRate || 0);
+            const quantity = Number(qty);
+            const totalCost = unitCost * quantity;
+            
+            const newItem = {
+              id: crypto.randomUUID(),
+              summaryId: summary.id,
+              referenceId: selectedMasterItem.id,
+              name: selectedMasterItem.name,
+              quantity,
+              unitCostAtTimeOfAdding: unitCost,
+              totalCost,
+              createdAt: new Date().toISOString()
+            };
+            
+            await createSummaryItem(newItem);
+            await cascadeCostUpdate(totalCost, summary.id);
+          }} 
+          MasterDataSelector={MasterDataSelector} 
+        />
       </div>
     </div>
   );

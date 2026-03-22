@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import Select from 'react-select';
+import { useVirtualizer } from '@tanstack/react-virtual';
 
 export const customStyles = {
   control: (provided, state) => ({
@@ -40,6 +41,55 @@ export const customStyles = {
   })
 };
 
+const VirtualMenuList = ({ options, children, maxHeight, getValue }) => {
+  const parentRef = useRef(null);
+  
+  const childArray = React.Children.toArray(children);
+  
+  const rowVirtualizer = useVirtualizer({
+    count: childArray.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 35, // default option height in px
+    overscan: 5,
+  });
+
+  const virtualItems = rowVirtualizer.getVirtualItems();
+  const totalSize = rowVirtualizer.getTotalSize();
+
+  return (
+    <div 
+      ref={parentRef} 
+      style={{ maxHeight, overflowY: 'auto' }}
+    >
+      <div 
+        style={{
+          height: `${totalSize}px`,
+          width: '100%',
+          position: 'relative'
+        }}
+      >
+        {virtualItems.map((virtualRow) => {
+          const child = childArray[virtualRow.index];
+          return (
+            <div
+              key={virtualRow.index}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${virtualRow.start}px)`
+              }}
+            >
+              {child}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 export function SelectCombo({ options, value, onChange, placeholder = "Select...", disabled = false, ...props }) {
   const selectedOption = options.find(o => o.value === value) || null;
   return (
@@ -52,6 +102,7 @@ export function SelectCombo({ options, value, onChange, placeholder = "Select...
       styles={customStyles}
       isClearable={false}
       isSearchable={true}
+      components={{ MenuList: VirtualMenuList }}
       {...props}
     />
   );

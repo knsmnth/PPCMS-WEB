@@ -102,6 +102,7 @@ export default function Facilities() {
                   onChange={setSelectedCampusId}
                   options={campuses.map(c => ({ value: c.id, label: c.name }))}
                   placeholder="Select a campus..."
+                  disabled={true}
                 />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>

@@ -99,10 +99,15 @@ export function SelectCombo({ options, value, onChange, placeholder = "Select...
       onChange={(opt) => onChange(opt ? opt.value : '')}
       placeholder={placeholder}
       isDisabled={disabled}
-      styles={customStyles}
+      styles={{
+        ...customStyles,
+        menuPortal: base => ({ ...base, zIndex: 9999 })
+      }}
       isClearable={false}
       isSearchable={true}
       components={{ MenuList: VirtualMenuList }}
+      menuPortalTarget={document.body}
+      menuPosition="fixed"
       {...props}
     />
   );

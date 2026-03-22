@@ -111,6 +111,7 @@ export default function Projects() {
                   onChange={setSelectedFacilityId} 
                   options={facilities.map(f => ({ value: f.id, label: f.name }))}
                   placeholder="Select facility..."
+                  disabled={true}
                 />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>

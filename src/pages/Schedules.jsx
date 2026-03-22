@@ -102,6 +102,7 @@ export default function Schedules() {
                   onChange={setSelectedProjectId} 
                   options={projects.map(p => ({ value: p.id, label: p.name }))}
                   placeholder="Select project..."
+                  disabled={true}
                 />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>

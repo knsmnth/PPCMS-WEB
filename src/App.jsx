@@ -4,6 +4,7 @@ import { initDB } from './lib/db';
 import { Sidebar } from './components/layout/sidebar';
 import { useAuth } from './hooks/useAuth';
 import { useOfflineSync } from './hooks/useOfflineSync';
+import { ConnectivityBadge } from './components/ui/connectivity-badge';
 import styles from './components/layout/layout.module.css';
 
 // Pages
@@ -29,10 +30,7 @@ function AuthenticatedApp() {
             <span className={styles.breadcrumbItem}>Overview</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.25rem 0.6rem', backgroundColor: '#ecfdf5', color: '#059669', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-              <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#059669' }}></div>
-              System Live
-            </span>
+            <ConnectivityBadge />
           </div>
         </header>
         <div className={styles.pageContent}>

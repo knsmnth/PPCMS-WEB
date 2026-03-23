@@ -1,0 +1,49 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper to check if a user is signed in
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Helper to get the signed-in user's email safely
+    function userEmail() {
+      return request.auth.token.email.lower();
+    }
+
+    // Check if the current user has explicitly been granted access
+    function hasActiveRole() {
+      let role = get(/databases/$(database)/documents/users/$(userEmail())).data.role;
+      return role == 'admin' || role == 'super_admin';
+    }
+
+    // Check if the current user is specifically a super_admin
+    function isSuperAdmin() {
+      return get(/databases/$(database)/documents/users/$(userEmail())).data.role == 'super_admin';
+    }
+
+    // 1. Users Collection (Role Management)
+    match /users/{emailId} {
+      // Anyone signed in needs to be able to read this collection to verify their role/bootstrap
+      allow read: if isAuth();
+      
+      // Super admins have full control over the users collection
+      allow write, delete: if isAuth() && isSuperAdmin();
+      
+      // Users can update their own document to refresh their `lastLogin`, `uid`, and `photoURL`
+      // They are explicitly DENIED from modifying their own `role`
+      allow update: if isAuth() && emailId == userEmail() 
+                    && request.resource.data.role == resource.data.role;
+                    
+      // Allow the very first user to assign themselves via bootstrapping 
+      allow create: if isAuth() && emailId == userEmail();
+    }
+
+    // 2. Application Data Collections
+    // Valid roles can read and write all operational data
+    match /{document=**} {
+      allow read, write: if isAuth() && hasActiveRole();
+    }
+  }
+}

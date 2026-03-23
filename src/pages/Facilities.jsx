@@ -177,11 +177,11 @@ export default function Facilities() {
             )}
 
             {paddingTop > 0 && (
-              <TableRow>
-                <TableCell colSpan={4} style={{ height: `${paddingTop}px`, padding: 0, border: 0 }}>
+              <tr style={{ height: `${paddingTop}px`, border: 'none' }}>
+                <td colSpan={4} style={{ padding: 0, border: 0 }}>
                   <div style={{ height: `${paddingTop}px` }} />
-                </TableCell>
-              </TableRow>
+                </td>
+              </tr>
             )}
 
             {virtualRows.map((virtualRow) => {
@@ -231,11 +231,11 @@ export default function Facilities() {
             )})}
             
             {paddingBottom > 0 && (
-              <TableRow>
-                <TableCell colSpan={4} style={{ height: `${paddingBottom}px`, padding: 0, border: 0 }}>
+              <tr style={{ height: `${paddingBottom}px`, border: 'none' }}>
+                <td colSpan={4} style={{ padding: 0, border: 0 }}>
                   <div style={{ height: `${paddingBottom}px` }} />
-                </TableCell>
-              </TableRow>
+                </td>
+              </tr>
             )}
           </TableBody>
         </Table>

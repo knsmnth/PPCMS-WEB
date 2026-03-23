@@ -30,7 +30,7 @@ export default function SummaryWorkspace() {
   const query = scheduleId ? [{ field: 'scheduleOfWorkId', operator: '==', value: scheduleId }] : [];
   
   const { data: summaries, createItem: createSummary, updateItem: updateSummary, refresh: refreshSummaries } = useCollection('scheduleSummaries', query);
-  const { data: items, createItem: createSummaryItem, deleteItem: deleteSummaryItem } = useCollection('summaryItems');
+  const { data: items, createItem: createSummaryItem, updateItem: updateSummaryItem, deleteItem: deleteSummaryItem } = useCollection('summaryItems');
   
   const { data: materials } = useCollection('materials');
   const { data: equipments } = useCollection('equipments');
@@ -231,6 +231,7 @@ export default function SummaryWorkspace() {
               groupItems={groupItems} 
               deleteSummaryItem={deleteSummaryItem} 
               createSummaryItem={createSummaryItem}
+              updateSummaryItem={updateSummaryItem}
               cascadeCostUpdate={cascadeCostUpdate}
               MasterDataSelector={MasterDataSelector}
             />
@@ -289,7 +290,7 @@ function AddItemForm({ summary, onAdd, MasterDataSelector }) {
   );
 }
 
-export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem, createSummaryItem, cascadeCostUpdate, MasterDataSelector }) {
+export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem, createSummaryItem, updateSummaryItem, cascadeCostUpdate, MasterDataSelector }) {
   const parentRef = React.useRef(null);
 
   const rowVirtualizer = useVirtualizer({
@@ -320,11 +321,11 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
           </TableHeader>
           <TableBody>
             {paddingTop > 0 && (
-              <TableRow>
-                <TableCell colSpan={5} style={{ height: `${paddingTop}px`, padding: 0, border: 0 }}>
+              <tr style={{ height: `${paddingTop}px`, border: 'none' }}>
+                <td colSpan={5} style={{ padding: 0, border: 0 }}>
                   <div style={{ height: `${paddingTop}px` }} />
-                </TableCell>
-              </TableRow>
+                </td>
+              </tr>
             )}
 
             {virtualRows.map((virtualRow) => {
@@ -362,11 +363,11 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
             })}
             
             {paddingBottom > 0 && (
-              <TableRow>
-                <TableCell colSpan={5} style={{ height: `${paddingBottom}px`, padding: 0, border: 0 }}>
+              <tr style={{ height: `${paddingBottom}px`, border: 'none' }}>
+                <td colSpan={5} style={{ padding: 0, border: 0 }}>
                   <div style={{ height: `${paddingBottom}px` }} />
-                </TableCell>
-              </TableRow>
+                </td>
+              </tr>
             )}
           </TableBody>
         </Table>
@@ -380,21 +381,36 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
             if (!selectedMasterItem || !qty) return;
             const unitCost = Number(selectedMasterItem.currentPrice || selectedMasterItem.currentRate || 0);
             const quantity = Number(qty);
-            const totalCost = unitCost * quantity;
+            const additionalCost = unitCost * quantity;
             
-            const newItem = {
-              id: crypto.randomUUID(),
-              summaryId: summary.id,
-              referenceId: selectedMasterItem.id,
-              name: selectedMasterItem.name,
-              quantity,
-              unitCostAtTimeOfAdding: unitCost,
-              totalCost,
-              createdAt: new Date().toISOString()
-            };
+            const existingItem = groupItems.find(i => i.referenceId === selectedMasterItem.id && i.unitCostAtTimeOfAdding === unitCost);
             
-            await createSummaryItem(newItem);
-            await cascadeCostUpdate(totalCost, summary.id);
+            if (existingItem) {
+              const newQty = existingItem.quantity + quantity;
+              const newTotalCost = existingItem.totalCost + additionalCost;
+              
+              await updateSummaryItem({
+                ...existingItem,
+                quantity: newQty,
+                totalCost: newTotalCost
+              });
+              await cascadeCostUpdate(additionalCost, summary.id);
+            } else {
+              const totalCost = additionalCost;
+              const newItem = {
+                id: crypto.randomUUID(),
+                summaryId: summary.id,
+                referenceId: selectedMasterItem.id,
+                name: selectedMasterItem.name,
+                quantity,
+                unitCostAtTimeOfAdding: unitCost,
+                totalCost,
+                createdAt: new Date().toISOString()
+              };
+              
+              await createSummaryItem(newItem);
+              await cascadeCostUpdate(totalCost, summary.id);
+            }
           }} 
           MasterDataSelector={MasterDataSelector} 
         />

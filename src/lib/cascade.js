@@ -1,10 +1,16 @@
 import { getAllFromDB, getFromDB, deleteFromDB, addToSyncQueue, getAllFromIndexDB } from './db';
 
+const notifyUpdate = (collectionName) => {
+  window.dispatchEvent(new CustomEvent('localDataUpdated', { detail: collectionName }));
+};
+
 const executeDelete = async (collection, id) => {
   const item = await getFromDB(collection, id);
   if (item) {
     await deleteFromDB(collection, id);
     await addToSyncQueue({ type: 'delete', collection, payload: item });
+    notifyUpdate(collection);
+    window.dispatchEvent(new Event('triggerSync'));
   }
 };
 

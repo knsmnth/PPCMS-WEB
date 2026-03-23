@@ -47,43 +47,7 @@ export function useCollection(collectionName, queryConstraints = [], pageLimit =
     // Instantly load data cache
     loadLocalData();
 
-    // 2. Real-time sync from Firestore when online
-    if (!navigator.onLine) return;
-
-    let q = collection(db, collectionName);
-    
-    // Apply constraints
-    queryConstraints.forEach(c => {
-      q = query(q, where(c.field, c.operator, c.value));
-    });
-    // Add pagination parameter
-    q = query(q, limit(pageLimit));
-
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-      let requiresLocalUpdate = false;
-      const changes = snapshot.docChanges();
-      
-      for (const change of changes) {
-        const docData = change.doc.data();
-        if (change.type === 'added' || change.type === 'modified') {
-          await putToDB(collectionName, docData);
-          requiresLocalUpdate = true;
-        }
-        if (change.type === 'removed') {
-          await deleteFromDB(collectionName, change.doc.id);
-          requiresLocalUpdate = true;
-        }
-      }
-      
-      // Reload UI only if server triggered meaningful DB diffs
-      if (requiresLocalUpdate) {
-        loadLocalData();
-      }
-    }, (err) => {
-       console.error(`onSnapshot error for ${collectionName}:`, err);
-    });
-
-    // 3. Listen for local cross-hook updates
+    // 3. Listen for local cross-hook updates FIRST (works offline & online)
     const handleLocalUpdate = (e) => {
       if (!e.detail || e.detail === collectionName) {
         loadLocalData();
@@ -91,8 +55,46 @@ export function useCollection(collectionName, queryConstraints = [], pageLimit =
     };
     window.addEventListener('localDataUpdated', handleLocalUpdate);
 
+    let unsubscribe = null;
+
+    // 2. Real-time sync from Firestore ONLY when online
+    if (navigator.onLine) {
+      let q = collection(db, collectionName);
+      
+      // Apply constraints
+      queryConstraints.forEach(c => {
+        q = query(q, where(c.field, c.operator, c.value));
+      });
+      // Add pagination parameter
+      q = query(q, limit(pageLimit));
+
+      unsubscribe = onSnapshot(q, async (snapshot) => {
+        let requiresLocalUpdate = false;
+        const changes = snapshot.docChanges();
+        
+        for (const change of changes) {
+          const docData = change.doc.data();
+          if (change.type === 'added' || change.type === 'modified') {
+            await putToDB(collectionName, docData);
+            requiresLocalUpdate = true;
+          }
+          if (change.type === 'removed') {
+            await deleteFromDB(collectionName, change.doc.id);
+            requiresLocalUpdate = true;
+          }
+        }
+        
+        // Reload UI only if server triggered meaningful DB diffs
+        if (requiresLocalUpdate) {
+          loadLocalData();
+        }
+      }, (err) => {
+         console.error(`onSnapshot error for ${collectionName}:`, err);
+      });
+    }
+
     return () => {
-      unsubscribe && unsubscribe();
+      if (unsubscribe) unsubscribe();
       window.removeEventListener('localDataUpdated', handleLocalUpdate);
     };
   }, [collectionName, JSON.stringify(queryConstraints), pageLimit]);

@@ -20,6 +20,12 @@ export default function AccessManagement() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 
   const fetchUsers = async () => {
+    if (!navigator.onLine) {
+      alert("Access Management requires an active internet connection to securely interact with the Firebase User Registry.");
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
     try {
       const usersRef = collection(db, 'users');

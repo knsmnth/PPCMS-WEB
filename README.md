@@ -101,6 +101,31 @@ sequenceDiagram
 3. **Data Chunking**: To prevent data-loss or rate-limiting during massive offline sync sessions, the queuing engine automatically slices large loads (e.g. 5,000 edits) into chunks (Batches of 500) and commits them globally in parallel.
 4. **Live Subscriptions**: When fully online, active Firestore `onSnapshot` engines stay persistent, seamlessly trickling multi-user real-time edits right back down into the local screen.
 
+## External API Integrations
+
+The PPOMS master data ecosystem is securely decoupled and exposes its central data natively for other authorized cross-department integration.
+
+```mermaid
+graph LR
+    subgraph VSU PPOMS Environment
+    MD[(Firestore: Public Master Data)]
+    end
+    
+    subgraph External University Systems
+    AS[Accounting System]
+    IS[Inventory System]
+    SIS[Other Sibling Apps]
+    end
+
+    AS -- "HTTP GET (Materials)" --> MD
+    IS -- "HTTP GET (Equipment)" --> MD
+    SIS -- "HTTP GET (Labor Types)" --> MD
+    
+    style MD fill:#4ade80,stroke:#0d1711,stroke-width:2px,color:#0d1711
+```
+
+By safely segregating Master Data rules structurally, external administrative systems can silently consume the live PPOMS pricing references. Developers across the university can pull JSON structures for `Materials`, `Equipments`, and `Labor Rates` via direct REST queries. This ensures PPOMS remains the singular source-of-truth for construction-level prices without bogging down databases with custom REST translation layers!
+
 ## Scalability
 
 The PPOMS architecture guarantees extreme horizontal and vertical scalability without crippling performance drops:

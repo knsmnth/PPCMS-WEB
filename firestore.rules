@@ -50,7 +50,7 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAuth() && hasActiveRole();
     }
-    match /labor/{document=**} {
+    match /laborTypes/{document=**} {
       allow read: if true;
       allow write: if isAuth() && hasActiveRole();
     }

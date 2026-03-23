@@ -18,7 +18,7 @@ const endpoints = [
   {
     name: 'Labor Rates',
     description: 'Fetch standard labor classifications and their daily wages.',
-    url: `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/labor`
+    url: `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/laborTypes`
   }
 ];
 
@@ -57,20 +57,20 @@ export default function APIIntegrations() {
             <p style={{ color: 'var(--muted-foreground)', fontSize: '0.95rem', margin: '0.25rem 0 0 0' }}>Connect external systems to the PPOMS Master Data architecture.</p>
           </div>
         </div>
-        
+
         <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>
-              <Server size={16} color="var(--primary)" />
-              <span>Serverless Edge</span>
-           </div>
-           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>
-              <Database size={16} color="var(--primary)" />
-              <span>Direct Firestore Access</span>
-           </div>
-           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>
-              <Activity size={16} color="var(--primary)" />
-              <span>Real-time Sync</span>
-           </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>
+            <Server size={16} color="var(--primary)" />
+            <span>Serverless Edge</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>
+            <Database size={16} color="var(--primary)" />
+            <span>Direct Firestore Access</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>
+            <Activity size={16} color="var(--primary)" />
+            <span>Real-time Sync</span>
+          </div>
         </div>
       </div>
 
@@ -82,12 +82,12 @@ export default function APIIntegrations() {
               <h2 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0, color: 'var(--foreground)' }}>{ep.name}</h2>
             </div>
             <p style={{ color: 'var(--muted-foreground)', fontSize: '0.9rem', marginBottom: '0' }}>{ep.description}</p>
-            
+
             <div className="url-box">
               <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginRight: '1rem' }}>
                 {ep.url}
               </span>
-              <button 
+              <button
                 className="copy-button"
                 onClick={() => handleCopy(ep.url, idx)}
                 title="Copy to clipboard"
@@ -105,9 +105,9 @@ export default function APIIntegrations() {
             </span>
             How to Integrate (Step-by-Step)
           </h3>
-          
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            
+
             <div>
               <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--foreground)', margin: '0 0 0.5rem 0' }}>Step 1: Choose Your Endpoint</h4>
               <p style={{ fontSize: '0.9rem', color: 'var(--muted-foreground)', lineHeight: 1.5, margin: 0 }}>
@@ -118,8 +118,15 @@ export default function APIIntegrations() {
             <div>
               <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--foreground)', margin: '0 0 0.5rem 0' }}>Step 2: Issue a HTTP GET Request</h4>
               <p style={{ fontSize: '0.9rem', color: 'var(--muted-foreground)', lineHeight: 1.5, margin: '0 0 0.75rem 0' }}>
-                Use any HTTP client in your application to ping the endpoint. Here is an example using JavaScript's <code style={{ background: 'var(--accent)', padding: '0.1rem 0.3rem', borderRadius: '4px' }}>fetch</code>:
+                Use any HTTP client or terminal application to ping the endpoint. Testing via terminal is extremely easy:
               </p>
+              
+              <h5 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '0.25rem' }}>Using cURL (Terminal)</h5>
+              <pre style={{ background: 'rgba(0,0,0,0.04)', padding: '1rem', borderRadius: '8px', overflowX: 'auto', margin: '0 0 1rem 0', fontSize: '0.85rem' }}>
+<code className="language-bash">{`curl -X GET "YOUR_COPIED_URL"`}</code>
+              </pre>
+
+              <h5 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '0.25rem' }}>Using JavaScript (Browser/Node.js)</h5>
               <pre style={{ background: 'rgba(0,0,0,0.04)', padding: '1rem', borderRadius: '8px', overflowX: 'auto', margin: 0, fontSize: '0.85rem' }}>
 <code className="language-javascript">{`fetch("YOUR_COPIED_URL")
   .then(response => response.json())
@@ -132,22 +139,21 @@ export default function APIIntegrations() {
               <p style={{ fontSize: '0.9rem', color: 'var(--muted-foreground)', lineHeight: 1.5, margin: '0 0 0.75rem 0' }}>
                 Google Cloud Firestore returns data using a type-safe structure. Every item is contained within the <code style={{ background: 'var(--accent)', padding: '0.1rem 0.3rem', borderRadius: '4px' }}>documents</code> array. You will need to drill into the <code style={{ background: 'var(--accent)', padding: '0.1rem 0.3rem', borderRadius: '4px' }}>fields</code> object to extract value properties (e.g., <code style={{ background: 'var(--accent)', padding: '0.1rem 0.3rem', borderRadius: '4px' }}>stringValue</code> or <code style={{ background: 'var(--accent)', padding: '0.1rem 0.3rem', borderRadius: '4px' }}>integerValue</code>).
               </p>
+              
+              <h5 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '0.25rem', marginTop: '1rem' }}>Example A: Materials Structure</h5>
               <pre style={{ background: 'rgba(0,0,0,0.04)', padding: '1rem', borderRadius: '8px', overflowX: 'auto', margin: 0, fontSize: '0.85rem' }}>
-<code className="language-json">{`// Example of incoming data structure:
-{
+                <code className="language-json">{`{
   "documents": [
     {
-      "name": "projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/materials/34b56603-5fa7...",
+      "name": "projects/\${FIREBASE_PROJECT_ID}/databases/(default)/documents/materials/34b56603-5fa7...",
       "fields": {
-        "updatedAt": {
-          "stringValue": "2026-03-23T01:46:13.127Z"
-        },
-        "createdAt": {
-          "stringValue": "2026-03-22T03:25:55.491Z"
-        },
-        "unit": {
-          "stringValue": "100"
-        },
+        "updatedAt": { "stringValue": "2026-03-23T01:46:13.127Z" },
+        "createdAt": { "stringValue": "2026-03-22T03:25:55.491Z" },
+        "unit": { "stringValue": "100" },
+        "name": { "stringValue": "TV" },
+        "currentPrice": { "integerValue": "15000" },
+        "id": { "stringValue": "34b56603-5fa7-4d0c-bb52-e9bce41aa5f0" },
+        "specs": { "stringValue": "Devant 32 inches" },
         "priceHistory": {
           "arrayValue": {
             "values": [
@@ -155,32 +161,76 @@ export default function APIIntegrations() {
                 "mapValue": {
                   "fields": {
                     "date": { "stringValue": "2026-03-23T01:46:13.127Z" },
-                    "price": { "integerValue": "300" }
-                  }
-                }
-              },
-              {
-                "mapValue": {
-                  "fields": {
-                    "price": { "integerValue": "200" },
-                    "date": { "stringValue": "2026-03-23T01:46:07.151Z" }
+                    "price": { "integerValue": "10000" }
                   }
                 }
               }
             ]
           }
-        },
-        "name": {
-          "stringValue": "TV"
-        },
-        "currentPrice": {
-          "integerValue": "300"
-        },
-        "id": {
-          "stringValue": "34b56603-5fa7-4d0c-bb52-e9bce41aa5f0"
-        },
-        "specs": {
-          "stringValue": "NDASND"
+        }
+      }
+    }
+  ]
+}`}</code>
+              </pre>
+
+              <h5 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '0.25rem', marginTop: '1.5rem' }}>Example B: Equipment Structure</h5>
+              <pre style={{ background: 'rgba(0,0,0,0.04)', padding: '1rem', borderRadius: '8px', overflowX: 'auto', margin: 0, fontSize: '0.85rem' }}>
+                <code className="language-json">{`{
+  "documents": [
+    {
+      "name": "projects/\${FIREBASE_PROJECT_ID}/databases/(default)/documents/equipments/e3e378e5-fe61...",
+      "fields": {
+        "updatedAt": { "stringValue": "2026-03-22T14:10:24.186Z" },
+        "createdAt": { "stringValue": "2026-03-22T03:26:24.843Z" },
+        "name": { "stringValue": "TV" },
+        "currentPrice": { "integerValue": "1000" },
+        "id": { "stringValue": "e3e378e5-fe61-424f-8768-7165436e9039" },
+        "specs": { "stringValue": "Devant" },
+        "priceHistory": {
+          "arrayValue": {
+            "values": [
+              {
+                "mapValue": {
+                  "fields": {
+                    "date": { "stringValue": "2026-03-22T14:10:24.186Z" },
+                    "price": { "integerValue": "1000" }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}`}</code>
+              </pre>
+
+              <h5 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '0.25rem', marginTop: '1.5rem' }}>Example C: Labor Structure</h5>
+              <pre style={{ background: 'rgba(0,0,0,0.04)', padding: '1rem', borderRadius: '8px', overflowX: 'auto', margin: 0, fontSize: '0.85rem' }}>
+                <code className="language-json">{`{
+  "documents": [
+    {
+      "name": "projects/\${FIREBASE_PROJECT_ID}/databases/(default)/documents/laborTypes/c7ace3d1-4e91...",
+      "fields": {
+        "createdAt": { "stringValue": "2026-03-22T14:27:25.458Z" },
+        "name": { "stringValue": "labor" },
+        "currentRate": { "integerValue": "500" },
+        "id": { "stringValue": "c7ace3d1-4e91-4eaa-b439-29df8fc6fa0a" },
+        "priceHistory": {
+          "arrayValue": {
+            "values": [
+              {
+                "mapValue": {
+                  "fields": {
+                    "date": { "stringValue": "2026-03-22T14:27:25.458Z" },
+                    "price": { "integerValue": "500" }
+                  }
+                }
+              }
+            ]
+          }
         }
       }
     }

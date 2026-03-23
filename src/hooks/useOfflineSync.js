@@ -60,6 +60,10 @@ export function useOfflineSync() {
     };
 
     window.addEventListener('online', syncData);
+    
+    // Trigger immediately on mount to process any queues from previous sessions
+    syncData();
+
     // Auto-sync heartbeat every 30 seconds if connection is unstable
     const interval = setInterval(syncData, 30000);
 

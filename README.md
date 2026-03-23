@@ -1,5 +1,5 @@
 # PPOMS - Project Price & Operations Management System
-### Visayas State University (VSU) - Physical Plant Office (PPO)
+### Visayas State University (VSU) - Property and Procurement Office (PPO)
 
 A robust, offline-first web application designed for the Visayas State University PPO to manage campuses, facilities, projects, and operational data seamlessly.
 

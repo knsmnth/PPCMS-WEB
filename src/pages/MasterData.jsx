@@ -207,7 +207,7 @@ export function VirtualizedMasterDataTable({ filteredData, fields, title, Icon, 
     count: filteredData.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 50, // estimated row height in px
-    overscan: 5,
+    overscan: 50,
   });
 
   const virtualRows = rowVirtualizer.getVirtualItems();

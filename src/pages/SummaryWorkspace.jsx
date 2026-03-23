@@ -296,7 +296,7 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
     count: groupItems.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 64, // estimated row height in px
-    overscan: 5,
+    overscan: 50,
   });
 
   const virtualRows = rowVirtualizer.getVirtualItems();

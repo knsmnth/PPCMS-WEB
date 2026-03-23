@@ -44,7 +44,7 @@ export default function Projects() {
     count: filteredData.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 72,
-    overscan: 5,
+    overscan: 50,
   });
 
   const virtualRows = rowVirtualizer.getVirtualItems();

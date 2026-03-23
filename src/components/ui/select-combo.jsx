@@ -50,7 +50,7 @@ const VirtualMenuList = ({ options, children, maxHeight, getValue }) => {
     count: childArray.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 35, // default option height in px
-    overscan: 5,
+    overscan: 50,
   });
 
   const virtualItems = rowVirtualizer.getVirtualItems();

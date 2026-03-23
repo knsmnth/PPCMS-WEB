@@ -60,6 +60,7 @@ export function useOfflineSync() {
     };
 
     window.addEventListener('online', syncData);
+    window.addEventListener('triggerSync', syncData);
     
     // Trigger immediately on mount to process any queues from previous sessions
     syncData();
@@ -69,6 +70,7 @@ export function useOfflineSync() {
 
     return () => {
       window.removeEventListener('online', syncData);
+      window.removeEventListener('triggerSync', syncData);
       clearInterval(interval);
     };
   }, []);

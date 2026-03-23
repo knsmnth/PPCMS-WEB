@@ -83,22 +83,38 @@ export function useCollection(collectionName, queryConstraints = [], pageLimit =
        console.error(`onSnapshot error for ${collectionName}:`, err);
     });
 
-    return () => unsubscribe();
+    // 3. Listen for local cross-hook updates
+    const handleLocalUpdate = (e) => {
+      if (!e.detail || e.detail === collectionName) {
+        loadLocalData();
+      }
+    };
+    window.addEventListener('localDataUpdated', handleLocalUpdate);
+
+    return () => {
+      unsubscribe && unsubscribe();
+      window.removeEventListener('localDataUpdated', handleLocalUpdate);
+    };
   }, [collectionName, JSON.stringify(queryConstraints), pageLimit]);
 
   // Unified Offline-First Write Methods
+  const notifyUpdate = () => {
+    window.dispatchEvent(new CustomEvent('localDataUpdated', { detail: collectionName }));
+    window.dispatchEvent(new Event('triggerSync'));
+  };
+
   const createItem = async (payload) => {
     const newItem = { ...payload, createdAt: new Date().toISOString() };
     await putToDB(collectionName, newItem);
     await addToSyncQueue({ type: 'create', collection: collectionName, payload: newItem });
-    loadLocalData();
+    notifyUpdate();
   };
 
   const updateItem = async (payload) => {
     const updatedItem = { ...payload, updatedAt: new Date().toISOString() };
     await putToDB(collectionName, updatedItem);
     await addToSyncQueue({ type: 'update', collection: collectionName, payload: updatedItem });
-    loadLocalData();
+    notifyUpdate();
   };
 
   const deleteItem = async (id) => {
@@ -106,7 +122,7 @@ export function useCollection(collectionName, queryConstraints = [], pageLimit =
     if (!item) return;
     await deleteFromDB(collectionName, id);
     await addToSyncQueue({ type: 'delete', collection: collectionName, payload: item });
-    loadLocalData();
+    notifyUpdate();
   };
 
   return { data, loading, createItem, updateItem, deleteItem, refresh: loadLocalData };

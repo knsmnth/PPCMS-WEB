@@ -100,6 +100,7 @@ sequenceDiagram
 2. **Background Re-Connectivity Engine**: Monitoring the `window.onLine` state, the robust `useOfflineSync` engine awakens the millisecond internet is restored. It translates the pending local operations and pushes them up to the cloud transparently.
 3. **Data Chunking**: To prevent data-loss or rate-limiting during massive offline sync sessions, the queuing engine automatically slices large loads (e.g. 5,000 edits) into chunks (Batches of 500) and commits them globally in parallel.
 4. **Live Subscriptions**: When fully online, active Firestore `onSnapshot` engines stay persistent, seamlessly trickling multi-user real-time edits right back down into the local screen.
+5. **Zero-Latency Cross-Component Sync**: Using a highly-custom pub/sub DOM Event API (`localDataUpdated`), changes made in isolated modals immediately alert parallel components across the UI. This eliminates local state desync without depending on top-down prop drilling or external state management libraries!
 
 ## External API Integrations
 

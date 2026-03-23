@@ -18,6 +18,7 @@ import SummaryWorkspace from './pages/SummaryWorkspace';
 import { MaterialCatalog, EquipmentManager, LaborManager } from './pages/MasterData';
 import AccessDenied from './pages/AccessDenied';
 import AccessManagement from './pages/AccessManagement';
+import APIIntegrations from './pages/APIIntegrations';
 
 function AuthenticatedApp() {
   const { user } = useAuth();
@@ -52,7 +53,10 @@ function AuthenticatedApp() {
             <Route path="/equipments" element={<EquipmentManager />} />
             <Route path="/labor" element={<LaborManager />} />
             {user.role === 'super_admin' && (
-              <Route path="/access" element={<AccessManagement />} />
+              <>
+                <Route path="/access" element={<AccessManagement />} />
+                <Route path="/api-integrations" element={<APIIntegrations />} />
+              </>
             )}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

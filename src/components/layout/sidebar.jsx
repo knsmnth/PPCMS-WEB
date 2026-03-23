@@ -11,7 +11,8 @@ import {
   Users, 
   LogOut,
   LayoutDashboard,
-  ShieldAlert
+  ShieldAlert,
+  Network
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../../hooks/useAuth';
@@ -95,6 +96,13 @@ export function Sidebar({ className }) {
             >
               <ShieldAlert className={styles.icon} />
               Access Management
+            </NavLink>
+            <NavLink
+              to="/api-integrations"
+              className={({ isActive }) => clsx(styles.link, isActive && styles.link_active)}
+            >
+              <Network className={styles.icon} />
+              API Integrations
             </NavLink>
           </React.Fragment>
         )}

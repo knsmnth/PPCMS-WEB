@@ -40,7 +40,22 @@ service cloud.firestore {
       allow create: if isAuth() && emailId == userEmail();
     }
 
-    // 2. Application Data Collections
+    // 3. API Integrations (Public Read for Master Data)
+    // Allows external sibling systems to query our equipment, labor, and materials
+    match /materials/{document=**} {
+      allow read: if true;
+      allow write: if isAuth() && hasActiveRole();
+    }
+    match /equipments/{document=**} {
+      allow read: if true;
+      allow write: if isAuth() && hasActiveRole();
+    }
+    match /labor/{document=**} {
+      allow read: if true;
+      allow write: if isAuth() && hasActiveRole();
+    }
+
+    // 4. Application Data Collections (Everything Else)
     // Valid roles can read and write all operational data
     match /{document=**} {
       allow read, write: if isAuth() && hasActiveRole();

@@ -237,7 +237,9 @@ export function VirtualizedMasterDataTable({ filteredData, fields, title, Icon, 
 
           {paddingTop > 0 && (
             <TableRow>
-              <TableCell colSpan={fields.length + 1} style={{ height: `${paddingTop}px`, padding: 0, border: 0 }} />
+              <TableCell colSpan={fields.length + 1} style={{ height: `${paddingTop}px`, padding: 0, border: 0 }}>
+                <div style={{ height: `${paddingTop}px` }} />
+              </TableCell>
             </TableRow>
           )}
 
@@ -288,7 +290,9 @@ export function VirtualizedMasterDataTable({ filteredData, fields, title, Icon, 
           
           {paddingBottom > 0 && (
             <TableRow>
-              <TableCell colSpan={fields.length + 1} style={{ height: `${paddingBottom}px`, padding: 0, border: 0 }} />
+              <TableCell colSpan={fields.length + 1} style={{ height: `${paddingBottom}px`, padding: 0, border: 0 }}>
+                <div style={{ height: `${paddingBottom}px` }} />
+              </TableCell>
             </TableRow>
           )}
         </TableBody>

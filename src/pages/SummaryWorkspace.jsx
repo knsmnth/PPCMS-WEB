@@ -321,7 +321,9 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
           <TableBody>
             {paddingTop > 0 && (
               <TableRow>
-                <TableCell colSpan={5} style={{ height: `${paddingTop}px`, padding: 0, border: 0 }} />
+                <TableCell colSpan={5} style={{ height: `${paddingTop}px`, padding: 0, border: 0 }}>
+                  <div style={{ height: `${paddingTop}px` }} />
+                </TableCell>
               </TableRow>
             )}
 
@@ -361,7 +363,9 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
             
             {paddingBottom > 0 && (
               <TableRow>
-                <TableCell colSpan={5} style={{ height: `${paddingBottom}px`, padding: 0, border: 0 }} />
+                <TableCell colSpan={5} style={{ height: `${paddingBottom}px`, padding: 0, border: 0 }}>
+                  <div style={{ height: `${paddingBottom}px` }} />
+                </TableCell>
               </TableRow>
             )}
           </TableBody>

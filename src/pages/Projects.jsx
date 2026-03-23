@@ -194,7 +194,9 @@ export default function Projects() {
 
             {paddingTop > 0 && (
               <TableRow>
-                <TableCell colSpan={4} style={{ height: `${paddingTop}px`, padding: 0, border: 0 }} />
+                <TableCell colSpan={4} style={{ height: `${paddingTop}px`, padding: 0, border: 0 }}>
+                  <div style={{ height: `${paddingTop}px` }} />
+                </TableCell>
               </TableRow>
             )}
 
@@ -248,7 +250,9 @@ export default function Projects() {
             
             {paddingBottom > 0 && (
               <TableRow>
-                <TableCell colSpan={4} style={{ height: `${paddingBottom}px`, padding: 0, border: 0 }} />
+                <TableCell colSpan={4} style={{ height: `${paddingBottom}px`, padding: 0, border: 0 }}>
+                  <div style={{ height: `${paddingBottom}px` }} />
+                </TableCell>
               </TableRow>
             )}
           </TableBody>

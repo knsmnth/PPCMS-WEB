@@ -16,10 +16,17 @@ import Projects from './pages/Projects';
 import Schedules from './pages/Schedules';
 import SummaryWorkspace from './pages/SummaryWorkspace';
 import { MaterialCatalog, EquipmentManager, LaborManager } from './pages/MasterData';
+import AccessDenied from './pages/AccessDenied';
+import AccessManagement from './pages/AccessManagement';
 
 function AuthenticatedApp() {
+  const { user } = useAuth();
   useOfflineSync(); 
   
+  if (!user?.role || user.role === 'none') {
+    return <AccessDenied />;
+  }
+
   return (
     <div className={styles.appContainer}>
       <Sidebar />
@@ -44,6 +51,10 @@ function AuthenticatedApp() {
             <Route path="/materials" element={<MaterialCatalog />} />
             <Route path="/equipments" element={<EquipmentManager />} />
             <Route path="/labor" element={<LaborManager />} />
+            {user.role === 'super_admin' && (
+              <Route path="/access" element={<AccessManagement />} />
+            )}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
       </main>

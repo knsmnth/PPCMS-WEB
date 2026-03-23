@@ -10,7 +10,8 @@ import {
   Wrench, 
   Users, 
   LogOut,
-  LayoutDashboard
+  LayoutDashboard,
+  ShieldAlert
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../../hooks/useAuth';
@@ -84,14 +85,31 @@ export function Sidebar({ className }) {
             {item.name}
           </NavLink>
         ))}
+
+        {user?.role === 'super_admin' && (
+          <React.Fragment>
+            <div className={styles.sectionTitle}>Administration</div>
+            <NavLink
+              to="/access"
+              className={({ isActive }) => clsx(styles.link, isActive && styles.link_active)}
+            >
+              <ShieldAlert className={styles.icon} />
+              Access Management
+            </NavLink>
+          </React.Fragment>
+        )}
       </nav>
 
       <div className={styles.footer}>
         <div style={{ padding: '0 0.5rem 0.75rem 0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <img 
-            src={user?.photoURL || 'https://ui-avatars.com/api/?name=' + user?.displayName} 
-            alt="User avatar" 
-            style={{ width: '2rem', height: '2rem', borderRadius: '50%', border: '1px solid var(--border)' }}
+            src={user?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.displayName || user?.email || 'User')}`}
+            alt="User" 
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.displayName || user?.email || 'User')}`;
+            }}
+            style={{ width: '2rem', height: '2rem', borderRadius: '50%', border: '1px solid var(--border)', objectFit: 'cover' }}
           />
           <div style={{ overflow: 'hidden' }}>
             <p style={{ fontSize: '0.8rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.displayName}</p>

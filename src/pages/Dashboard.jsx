@@ -1,11 +1,11 @@
 import React from 'react';
 import { useCollection } from '../hooks/useData';
-import { 
-  Building2, 
-  Folder, 
-  Calendar, 
-  TrendingUp, 
-  Layers, 
+import {
+  Building2,
+  Folder,
+  Calendar,
+  TrendingUp,
+  Layers,
   ArrowUpRight,
   Calculator,
   Database
@@ -60,7 +60,7 @@ export default function Dashboard() {
             </div>
             <p style={{ opacity: 0.8, maxWidth: '320px', fontSize: '0.95rem', lineHeight: 1.6 }}>Draft your itemized cost schedules with offline-first persistence. Synced immediately when online.</p>
           </div>
-          <Button style={{ alignSelf: 'flex-start', backgroundColor: '#fff', color: 'var(--primary)', fontWeight: 700 }} onClick={() => navigate('/summary')}>
+          <Button style={{ alignSelf: 'flex-start', backgroundColor: '#fff', color: 'var(--primary)', fontWeight: 700 }} onClick={() => navigate('/campuses')}>
             Open Workspace
           </Button>
         </div>
@@ -73,7 +73,7 @@ export default function Dashboard() {
             </h3>
             <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.25rem 0.6rem', backgroundColor: '#dcfce7', color: '#15803d', borderRadius: '0.5rem' }}>Synced</span>
           </div>
-          
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
               <span style={{ color: 'var(--muted-foreground)' }}>IndexedDB Persistence</span>

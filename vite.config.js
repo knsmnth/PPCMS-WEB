@@ -13,7 +13,7 @@ export default defineConfig({
         name: 'PPOMS Operations Management',
         short_name: 'PPOMS',
         description: 'Project Price & Operations Management System',
-        theme_color: '#4ade80',
+        theme_color: '#163a21',
         background_color: '#ffffff',
         display: 'standalone',
         icons: [

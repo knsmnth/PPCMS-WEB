@@ -3,6 +3,18 @@ import { openDB } from 'idb';
 const DB_NAME = 'ppoms-offline-db';
 const DB_VERSION = 2; // Incremented for Index Creation
 
+export const ALL_STORES = [
+  'campuses',
+  'facilities',
+  'projects',
+  'schedulesOfWork',
+  'scheduleSummaries',
+  'summaryItems',
+  'materials',
+  'equipments',
+  'laborTypes',
+];
+
 export async function initDB() {
   return openDB(DB_NAME, DB_VERSION, {
     upgrade(db, oldVersion, newVersion, transaction) {
@@ -120,4 +132,25 @@ export async function getSyncQueue() {
 export async function removeFromSyncQueue(id) {
   const db = await initDB();
   return db.delete('syncQueue', id);
+}
+
+// ─── Bulk / Clear Helpers ────────────────────────────────────────────────────
+
+export async function clearStore(storeName) {
+  const db = await initDB();
+  return db.clear(storeName);
+}
+
+export async function clearAllStores() {
+  const db = await initDB();
+  await Promise.all(ALL_STORES.map((s) => db.clear(s)));
+  // Also wipe the offline sync queue so stale ops don't re-upload
+  await db.clear('syncQueue');
+}
+
+export async function bulkPutToDB(storeName, items) {
+  if (!items || items.length === 0) return;
+  const db = await initDB();
+  const tx = db.transaction(storeName, 'readwrite');
+  await Promise.all([...items.map((item) => tx.store.put(item)), tx.done]);
 }

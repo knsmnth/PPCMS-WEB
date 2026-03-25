@@ -12,7 +12,8 @@ import {
   LogOut,
   LayoutDashboard,
   ShieldAlert,
-  Network
+  Network,
+  HardDriveDownload
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../../hooks/useAuth';
@@ -103,6 +104,13 @@ export function Sidebar({ className }) {
             >
               <Network className={styles.icon} />
               API Integrations
+            </NavLink>
+            <NavLink
+              to="/data-management"
+              className={({ isActive }) => clsx(styles.link, isActive && styles.link_active)}
+            >
+              <HardDriveDownload className={styles.icon} />
+              Data Management
             </NavLink>
           </React.Fragment>
         )}

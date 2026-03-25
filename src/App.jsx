@@ -19,6 +19,7 @@ import { MaterialCatalog, EquipmentManager, LaborManager } from './pages/MasterD
 import AccessDenied from './pages/AccessDenied';
 import AccessManagement from './pages/AccessManagement';
 import APIIntegrations from './pages/APIIntegrations';
+import DataManagement from './pages/DataManagement';
 
 function AuthenticatedApp() {
   const { user } = useAuth();
@@ -56,6 +57,7 @@ function AuthenticatedApp() {
               <>
                 <Route path="/access" element={<AccessManagement />} />
                 <Route path="/api-integrations" element={<APIIntegrations />} />
+                <Route path="/data-management" element={<DataManagement />} />
               </>
             )}
             <Route path="*" element={<Navigate to="/" replace />} />

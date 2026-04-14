@@ -1,4 +1,4 @@
-import { getAllFromDB, getFromDB, deleteFromDB, addToSyncQueue, getAllFromIndexDB } from './db';
+import { getAllFromDB, getFromDB, deleteFromDB, putToDB, addToSyncQueue, getAllFromIndexDB } from './db';
 
 const notifyUpdate = (collectionName) => {
   window.dispatchEvent(new CustomEvent('localDataUpdated', { detail: collectionName }));
@@ -12,6 +12,13 @@ const executeDelete = async (collection, id) => {
     notifyUpdate(collection);
     window.dispatchEvent(new Event('triggerSync'));
   }
+};
+
+const executeCreate = async (collection, payload) => {
+  await putToDB(collection, payload);
+  await addToSyncQueue({ type: 'create', collection, payload });
+  notifyUpdate(collection);
+  window.dispatchEvent(new Event('triggerSync'));
 };
 
 export const cascadeDelete = async (type, id) => {
@@ -58,6 +65,68 @@ export const cascadeDelete = async (type, id) => {
     catch { items = (await getAllFromDB('summaryItems')).filter(i => i.summaryId === id); }
     for (const item of items) {
       await executeDelete('summaryItems', item.id);
+    }
+  }
+};
+
+export const cascadeDuplicateProject = async ({ sourceProjectId, newProjectPayload }) => {
+  const sourceProject = await getFromDB('projects', sourceProjectId);
+  if (!sourceProject) {
+    throw new Error('Source project not found');
+  }
+
+  await executeCreate('projects', newProjectPayload);
+
+  let schedules = [];
+  try {
+    schedules = await getAllFromIndexDB('schedulesOfWork', 'projectId', sourceProjectId);
+  } catch {
+    schedules = (await getAllFromDB('schedulesOfWork')).filter(s => s.projectId === sourceProjectId);
+  }
+
+  for (const schedule of schedules) {
+    const newScheduleId = crypto.randomUUID();
+    const newSchedule = {
+      ...schedule,
+      id: newScheduleId,
+      projectId: newProjectPayload.id,
+      createdAt: new Date().toISOString()
+    };
+    await executeCreate('schedulesOfWork', newSchedule);
+
+    let summaries = [];
+    try {
+      summaries = await getAllFromIndexDB('scheduleSummaries', 'scheduleOfWorkId', schedule.id);
+    } catch {
+      summaries = (await getAllFromDB('scheduleSummaries')).filter(sum => sum.scheduleOfWorkId === schedule.id);
+    }
+
+    for (const summary of summaries) {
+      const newSummaryId = crypto.randomUUID();
+      const newSummary = {
+        ...summary,
+        id: newSummaryId,
+        scheduleOfWorkId: newScheduleId,
+        createdAt: new Date().toISOString()
+      };
+      await executeCreate('scheduleSummaries', newSummary);
+
+      let items = [];
+      try {
+        items = await getAllFromIndexDB('summaryItems', 'summaryId', summary.id);
+      } catch {
+        items = (await getAllFromDB('summaryItems')).filter(item => item.summaryId === summary.id);
+      }
+
+      for (const item of items) {
+        const newItem = {
+          ...item,
+          id: crypto.randomUUID(),
+          summaryId: newSummaryId,
+          createdAt: new Date().toISOString()
+        };
+        await executeCreate('summaryItems', newItem);
+      }
     }
   }
 };

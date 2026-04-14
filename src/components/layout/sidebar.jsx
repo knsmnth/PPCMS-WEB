@@ -24,16 +24,19 @@ import styles from './sidebar.module.css';
 export const SidebarContext = createContext({ isCollapsed: false });
 export const useSidebar = () => useContext(SidebarContext);
 
-const topLevelItems = [
-  { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-  { name: 'Campuses', path: '/campuses', icon: Building2 },
+const dashboardItem = [
+  { name: 'Dashboard', path: '/', icon: LayoutDashboard }
 ];
 
-const dependentItems = [
-  { name: 'Facilities', path: '/facilities', icon: Building },
-  { name: 'Projects', path: '/projects', icon: Folder },
-  { name: 'Schedules of Work', path: '/schedules', icon: Calendar },
-  { name: 'Summary Workspace', path: '/summary', icon: Calculator },
+const operationsItems = [
+  { name: 'Projects', path: '/projects', icon: Folder, type: 'nav' },
+  { name: 'Schedules of Work', path: '/schedules', icon: Calendar, type: 'dep' },
+  { name: 'Summary Workspace', path: '/summary', icon: Calculator, type: 'dep' },
+];
+
+const locationItems = [
+  { name: 'Campuses', path: '/campuses', icon: Building2, type: 'nav' },
+  { name: 'Facilities', path: '/facilities', icon: Building, type: 'dep' },
 ];
 
 const masterDataItems = [
@@ -69,9 +72,7 @@ export function Sidebar({ className }) {
 
           {/* ── Navigation ── */}
           <nav className={styles.nav}>
-            <div className={styles.sectionTitle}><span>Operations</span></div>
-
-            {topLevelItems.map((item) => (
+            {dashboardItem.map((item) => (
               <NavLink
                 key={item.path}
                 to={item.path}
@@ -83,18 +84,64 @@ export function Sidebar({ className }) {
               </NavLink>
             ))}
 
-            {dependentItems.map((item) => {
-              const active = location.pathname.startsWith(item.path);
-              return (
-                <div
-                  key={item.path}
-                  className={clsx(styles.link, active ? styles.link_active : styles.link_disabled)}
-                  title={isCollapsed ? item.name : (!active ? 'Please select a parent entity first.' : '')}
-                >
-                  <item.icon className={styles.icon} />
-                  <span className={styles.linkText}>{item.name}</span>
-                </div>
-              );
+            <div className={styles.sectionTitle}><span>Operations</span></div>
+
+            {operationsItems.map((item) => {
+              if (item.type === 'nav') {
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    className={({ isActive }) => clsx(styles.link, isActive && styles.link_active)}
+                    title={isCollapsed ? item.name : ''}
+                  >
+                    <item.icon className={styles.icon} />
+                    <span className={styles.linkText}>{item.name}</span>
+                  </NavLink>
+                );
+              } else {
+                const active = location.pathname.startsWith(item.path);
+                return (
+                  <div
+                    key={item.path}
+                    className={clsx(styles.link, active ? styles.link_active : styles.link_disabled)}
+                    title={isCollapsed ? item.name : (!active ? 'Please select a parent entity first.' : '')}
+                  >
+                    <item.icon className={styles.icon} />
+                    <span className={styles.linkText}>{item.name}</span>
+                  </div>
+                );
+              }
+            })}
+
+            <div className={styles.sectionTitle}><span>Infrastructure</span></div>
+
+            {locationItems.map((item) => {
+              if (item.type === 'nav') {
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    className={({ isActive }) => clsx(styles.link, isActive && styles.link_active)}
+                    title={isCollapsed ? item.name : ''}
+                  >
+                    <item.icon className={styles.icon} />
+                    <span className={styles.linkText}>{item.name}</span>
+                  </NavLink>
+                );
+              } else {
+                const active = location.pathname.startsWith(item.path);
+                return (
+                  <div
+                    key={item.path}
+                    className={clsx(styles.link, active ? styles.link_active : styles.link_disabled)}
+                    title={isCollapsed ? item.name : (!active ? 'Please select a parent entity first.' : '')}
+                  >
+                    <item.icon className={styles.icon} />
+                    <span className={styles.linkText}>{item.name}</span>
+                  </div>
+                );
+              }
             })}
 
             <div className={styles.sectionTitle}><span>Master Data</span></div>

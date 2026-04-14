@@ -5,8 +5,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '../components/ui/dialog';
-import { Folder, Plus, ArrowRight, ArrowLeft, Edit2, Trash2, Search } from 'lucide-react';
-import { cascadeDelete } from '../lib/cascade';
+import { Folder, Plus, Edit2, Trash2, Search, Copy, ChevronDown, ArrowRight } from 'lucide-react';
+import { cascadeDelete, cascadeDuplicateProject } from '../lib/cascade';
 import { SelectCombo } from '../components/ui/select-combo';
 import { Select } from '../components/ui/select';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -18,33 +18,121 @@ export default function Projects() {
   
   const { data: projects, createItem, updateItem, refresh } = useCollection('projects', query);
   const { data: facilities } = useCollection('facilities');
-  const facility = facilities.find(f => f.id === facilityId);
+  const { data: campuses } = useCollection('campuses');
+  const facility = facilityId ? facilities.find(f => f.id === facilityId) : null;
+  const initialCampusId = facility ? facility.campusId : '';
   
   const navigate = useNavigate();
+
+  // Create state
   const [name, setName] = useState('');
-  const [status, setStatus] = useState('Planning');
+  const [description, setDescription] = useState('');
+  const [status, setStatus] = useState('Planning Phase');
+  const [priority, setPriority] = useState('Medium');
+  const [approvedBudget, setApprovedBudget] = useState('');
+  const [selectedCampusId, setSelectedCampusId] = useState(initialCampusId);
   const [selectedFacilityId, setSelectedFacilityId] = useState(facilityId || '');
 
+  const availableFacilities = facilities.filter(f => f.campusId === selectedCampusId);
+
+  // Edit state
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
   const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
   const [editStatus, setEditStatus] = useState('');
-  
-  const [searchQuery, setSearchQuery] = useState('');
+  const [editPriority, setEditPriority] = useState('');
+  const [editTotalCost, setEditTotalCost] = useState('');
+  const [editApprovedBudget, setEditApprovedBudget] = useState('');
+  const [editCampusId, setEditCampusId] = useState('');
+  const [editFacilityId, setEditFacilityId] = useState('');
 
-  const filteredData = useMemo(() => {
-    return projects.filter(p => 
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      (p.status && p.status.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
-  }, [projects, searchQuery]);
+  const availableEditFacilities = facilities.filter(f => f.campusId === editCampusId);
+
+  // Filters & Sorting
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortConfig, setSortConfig] = useState({ key: 'projectCode', direction: 'asc' });
+  const [priorityFilter, setPriorityFilter] = useState('All');
+  const [yearFilter, setYearFilter] = useState('All');
+
+  const generateProjectCode = (existingProjects) => {
+    const yearPrefix = new Date().getFullYear().toString().slice(-2);
+    const thisYearProjects = existingProjects.filter(p => p.projectCode && p.projectCode.startsWith(yearPrefix + '.'));
+    let maxNum = 0;
+    thisYearProjects.forEach(p => {
+      const parts = p.projectCode.split('.');
+      if (parts.length === 2) {
+        const num = parseInt(parts[1], 10);
+        if (!isNaN(num) && num > maxNum) maxNum = num;
+      }
+    });
+    return `${yearPrefix}.${String(maxNum + 1).padStart(3, '0')}`;
+  };
+
+  const normalizeMoneyInput = (value) => {
+    const cleaned = String(value || '').replace(/,/g, '').replace(/[^\d.]/g, '');
+    const [intPart = '', ...decimalParts] = cleaned.split('.');
+    const normalizedInt = intPart.replace(/^0+(\d)/, '$1');
+
+    if (decimalParts.length === 0) {
+      return normalizedInt;
+    }
+
+    return `${normalizedInt || '0'}.${decimalParts.join('')}`;
+  };
+
+  const formatMoneyInput = (value) => {
+    const normalized = normalizeMoneyInput(value);
+    if (!normalized) return '';
+
+    const [intPart, decimalPart] = normalized.split('.');
+    const formattedInt = Number(intPart || 0).toLocaleString('en-US');
+    return decimalPart !== undefined ? `${formattedInt}.${decimalPart}` : formattedInt;
+  };
+
+  const processedData = useMemo(() => {
+    let result = projects.filter(p => {
+      const matchesSearch = p.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            p.projectCode?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesPriority = priorityFilter === 'All' || p.priority === priorityFilter;
+      
+      let matchesYear = true;
+      if (yearFilter !== 'All') {
+        const pYear = '20' + (p.projectCode?.split('.')[0] || '');
+        if (pYear !== yearFilter) matchesYear = false;
+      }
+      
+      return matchesSearch && matchesPriority && matchesYear;
+    });
+
+    if (sortConfig.key) {
+      result.sort((a, b) => {
+        let aValue = a[sortConfig.key] || '';
+        let bValue = b[sortConfig.key] || '';
+        
+        if (['totalCost', 'approvedBudget'].includes(sortConfig.key)) {
+           aValue = Number(aValue);
+           bValue = Number(bValue);
+        } else {
+           aValue = aValue.toString().toLowerCase();
+           bValue = bValue.toString().toLowerCase();
+        }
+
+        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return result;
+  }, [projects, searchQuery, priorityFilter, yearFilter, sortConfig]);
 
   const parentRef = useRef(null);
   const rowVirtualizer = useVirtualizer({
-    count: filteredData.length,
+    count: processedData.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 72,
-    overscan: 50,
+    estimateSize: () => 100,
+    overscan: 10,
   });
 
   const virtualRows = rowVirtualizer.getVirtualItems();
@@ -52,73 +140,162 @@ export default function Projects() {
   const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
   const paddingBottom = virtualRows.length > 0 ? totalSize - virtualRows[virtualRows.length - 1].end : 0;
 
+  const handleSort = (key) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
   const handleCreate = async () => {
     if (!name || !selectedFacilityId) return;
     const id = crypto.randomUUID();
-    await createItem({ id, facilityId: selectedFacilityId, name, status, totalCost: 0 });
+    const pCode = generateProjectCode(projects);
+    const newProject = { 
+      id, 
+      facilityId: selectedFacilityId, 
+      name, 
+      description,
+      status, 
+      priority,
+      projectCode: pCode,
+      totalCost: 0,
+      approvedBudget: Number(approvedBudget),
+      createdAt: Date.now(),
+      statusHistory: [{
+        status,
+        changedAt: Date.now()
+      }]
+    };
+    await createItem(newProject);
+    refresh();
     setName('');
+    setDescription('');
+    setApprovedBudget('');
   };
 
   const handleEdit = async () => {
     if (!editName || !editingProject) return;
-    await updateItem({
+    
+    const updates = {
       ...editingProject,
       name: editName,
-      status: editStatus
-    });
+      description: editDescription,
+      status: editStatus,
+      priority: editPriority,
+      facilityId: editFacilityId,
+      totalCost: Number(editTotalCost),
+      approvedBudget: Number(editApprovedBudget)
+    };
+
+    if (editingProject.status !== editStatus) {
+      updates.statusHistory = [
+        ...(editingProject.statusHistory || []),
+        { status: editStatus, changedAt: Date.now() }
+      ];
+    }
+    
+    await updateItem(updates);
+    refresh();
     setEditDialogOpen(false);
     setEditingProject(null);
   };
 
-  const handleDelete = async (id) => {
-    if (confirm("Are you sure you want to delete this project? All underlying schedules and items will be permanently deleted.")) {
+  const handleInlineStatusChange = async (e, project, newStatus) => {
+    e.stopPropagation();
+    if (project.status === newStatus) return;
+    const updates = {
+      ...project,
+      status: newStatus,
+      statusHistory: [
+        ...(project.statusHistory || []),
+        { status: newStatus, changedAt: Date.now() }
+      ]
+    };
+    await updateItem(updates);
+    refresh();
+  };
+
+  const handleInlinePriorityChange = async (e, project, newPriority) => {
+    e.stopPropagation();
+    if (project.priority === newPriority) return;
+    await updateItem({ ...project, priority: newPriority });
+    refresh();
+  };
+
+  const handleDelete = async (e, id) => {
+    e.stopPropagation();
+    if (confirm("Are you sure you want to delete this project?")) {
       await cascadeDelete('project', id);
       refresh();
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status.toLowerCase()) {
-      case 'active': return { bg: '#dcfce7', text: '#15803d' };
-      case 'completed': return { bg: '#dbeafe', text: '#1d4ed8' };
-      case 'planning phase':
-      case 'planning': return { bg: '#fef3c7', text: '#b45309' };
-      default: return { bg: '#f4f4f5', text: '#71717a' };
+  const handleDuplicate = async (e, project) => {
+    e.stopPropagation();
+    const newId = crypto.randomUUID();
+    const pCode = generateProjectCode(projects);
+    await cascadeDuplicateProject({
+      sourceProjectId: project.id,
+      newProjectPayload: {
+        ...project,
+        id: newId,
+        projectCode: pCode,
+        name: `${project.name} (Copy)`,
+        createdAt: new Date().toISOString(),
+        statusHistory: [{ status: project.status, changedAt: Date.now() }]
+      }
+    });
+    refresh();
+  };
+
+  const getPriorityColor = (level) => {
+    switch (level?.toLowerCase()) {
+      case 'low': return { bg: '#0ea5e9', text: '#ffffff' }; // Light Blue
+      case 'medium': return { bg: '#22c55e', text: '#ffffff' }; // Green
+      case 'high': return { bg: '#eab308', text: '#ffffff' }; // Yellow
+      case 'very high': return { bg: '#dc2626', text: '#ffffff' }; // Red
+      default: return { bg: '#71717a', text: '#ffffff' };
     }
   };
 
-  if (!facilityId) {
-    return (
-      <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '1rem', color: 'var(--muted-foreground)' }}>
-        <Folder size={48} style={{ opacity: 0.2 }} />
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)' }}>Context Required</h2>
-        <p>Please select a specific Facility from the directory to view its associated projects.</p>
-        <Button onClick={() => navigate('/facilities')} variant="outline" style={{ marginTop: '1rem' }}>
-          Return to Facilities
-        </Button>
-      </div>
-    );
-  }
+  const getStatusColor = (currentStatus) => {
+    switch (currentStatus?.toLowerCase()) {
+      case 'accepted': return { bg: '#10b981', text: '#ffffff' };
+      case 'planning phase': return { bg: '#f59e0b', text: '#ffffff' };
+      case 'on-going': return { bg: '#1e3a8a', text: '#ffffff' }; // Dark Blue from mockup
+      case 'on review': return { bg: '#8b5cf6', text: '#ffffff' };
+      case 'for submission': return { bg: '#6366f1', text: '#ffffff' };
+      case 'closed': return { bg: '#3f3f46', text: '#ffffff' };
+      default: return { bg: '#166534', text: '#ffffff' }; // Dark Green default
+    }
+  };
 
   return (
-    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem', paddingBottom: '4rem' }}>
+      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
         <div>
-          {facilityId && (
-            <button 
-              onClick={() => navigate(`/facilities${facility ? `?campusId=${facility.campusId}` : ''}`)}
-              style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.8rem', cursor: 'pointer', marginBottom: '0.5rem', fontWeight: 600 }}
-            >
-              <ArrowLeft size={14} /> Back to Facilities
-            </button>
-          )}
-          <h1 style={{ fontSize: '1.875rem', fontWeight: 800, color: 'var(--primary)', letterSpacing: '-0.03em' }}>
-            {facility ? `${facility.name} Projects` : `Core Projects`}
+          <h1 style={{ fontSize: '2.25rem', fontWeight: 800, color: 'var(--foreground)', letterSpacing: '-0.02em', margin: 0 }}>
+            Project Overview
           </h1>
-          <p style={{ color: 'var(--muted-foreground)', fontSize: '0.925rem', marginTop: '0.25rem' }}>Strategic operational projects focused on maintenance and expansion.</p>
         </div>
         
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+             <Select value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
+                <option value="All">All Years</option>
+                <option value={new Date().getFullYear().toString()}>Current Year</option>
+             </Select>
+             <Select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)}>
+                <option value="All">All Priorities</option>
+                <option value="Very High">Very High</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+             </Select>
+          </div>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'var(--background)', padding: '0 1rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', width: '300px', height: '2.5rem' }}>
             <Search size={16} color="var(--muted-foreground)" />
             <input 
@@ -131,39 +308,80 @@ export default function Projects() {
           </div>
           <Dialog>
             <DialogTrigger asChild>
-              <Button>
+              <Button style={{ backgroundColor: '#092e20', color: 'white' }}>
                 <Plus size={18} />
                 Initialize Project
               </Button>
             </DialogTrigger>
-            <DialogContent>
+              <DialogContent style={{ maxHeight: '85vh', overflowY: 'visible' }} onInteractOutside={(e) => e.preventDefault()}>
               <DialogHeader><DialogTitle>New Project Specification</DialogTitle></DialogHeader>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Facility Context</label>
-                  <SelectCombo 
-                    value={selectedFacilityId} 
-                    onChange={setSelectedFacilityId} 
-                    options={facilities.map(f => ({ value: f.id, label: f.name }))}
-                    placeholder="Select facility..."
-                    disabled={true}
-                  />
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Campus</label>
+                    <SelectCombo 
+                      value={selectedCampusId} 
+                      onChange={(val) => {
+                        setSelectedCampusId(val);
+                        setSelectedFacilityId('');
+                      }} 
+                      options={campuses.map(c => ({ value: c.id, label: c.name }))}
+                      placeholder="Select campus..."
+                      disabled={!!facilityId}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Facility Context</label>
+                    <SelectCombo 
+                      value={selectedFacilityId} 
+                      onChange={setSelectedFacilityId} 
+                      options={availableFacilities.map(f => ({ value: f.id, label: f.name }))}
+                      placeholder="Select facility..."
+                      disabled={!!facilityId || !selectedCampusId}
+                    />
+                  </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Project Name</label>
-                  <Input placeholder="e.g. Roof Replacement 2024" value={name} onChange={(e) => setName(e.target.value)} />
+                  <Input placeholder="e.g. Total Renovation" value={name} onChange={(e) => setName(e.target.value)} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Operational Status</label>
-                  <Select 
-                    value={status} 
-                    onChange={(e) => setStatus(e.target.value)}
-                  >
-                    <option value="Planning">Planning Phase</option>
-                    <option value="Active">Operational / Active</option>
-                    <option value="Completed">Project Completed</option>
-                    <option value="On Hold">Strategically Paused</option>
-                  </Select>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Project Description</label>
+                  <Input placeholder="e.g. Replacement of roofing..." value={description} onChange={(e) => setDescription(e.target.value)} />
+                </div>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                    <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Priority</label>
+                    <Select value={priority} onChange={(e) => setPriority(e.target.value)}>
+                        <option value="Low">Low - Light Blue</option>
+                        <option value="Medium">Medium - Green</option>
+                        <option value="High">High - Yellow</option>
+                        <option value="Very High">Very High - Red</option>
+                    </Select>
+                    </div>
+                    <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Status</label>
+                    <Select value={status} onChange={(e) => setStatus(e.target.value)}>
+                        <option value="Accepted">Accepted</option>
+                        <option value="Planning Phase">Planning Phase</option>
+                        <option value="On-Going">On-Going</option>
+                        <option value="On Review">On Review</option>
+                        <option value="For Submission">For Submission</option>
+                        <option value="Closed">Closed</option>
+                    </Select>
+                    </div>
+                </div>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                    <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Approved Budget (Php)</label>
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={formatMoneyInput(approvedBudget)}
+                      onChange={(e) => setApprovedBudget(normalizeMoneyInput(e.target.value))}
+                    />
+                    </div>
                 </div>
                 <DialogClose asChild><Button onClick={handleCreate} disabled={!selectedFacilityId}>Create Project Instance</Button></DialogClose>
               </div>
@@ -172,77 +390,171 @@ export default function Projects() {
         </div>
       </header>
 
-      <div ref={parentRef} style={{ maxHeight: '600px', overflow: 'auto', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+      <div ref={parentRef} style={{ maxHeight: '600px', overflow: 'auto', borderRadius: '0.5rem', border: '1px solid #d4d4d8', backgroundColor: 'white' }}>
         <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
-          <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'var(--background)' }}>
+          <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'white', borderBottom: '1px solid #d4d4d8' }}>
             <TableRow>
-              <TableHead>Project Definition</TableHead>
-              <TableHead>Phase Status</TableHead>
-              <TableHead style={{ textAlign: 'right' }}>Budgeted Expense</TableHead>
+              <TableHead onClick={() => handleSort('projectCode')} style={{ cursor: 'pointer', textAlign: 'center', width: '120px', color: '#166534', fontWeight: 800, fontSize: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
+                  PROJECT CODE <ChevronDown size={14} style={{ opacity: 0.5, transform: sortConfig.key === 'projectCode' && sortConfig.direction === 'asc' ? 'rotate(180deg)' : 'none' }} />
+                </div>
+              </TableHead>
+              <TableHead style={{ color: '#166534', fontWeight: 800, fontSize: '0.75rem', width: '35%' }}>PROJECT NAME & DESCRIPTION</TableHead>
+              <TableHead onClick={() => handleSort('priority')} style={{ cursor: 'pointer', textAlign: 'center', color: '#166534', fontWeight: 800, fontSize: '0.75rem' }}>
+                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
+                  PROJECT PRIORITY <ChevronDown size={14} style={{ opacity: 0.5, transform: sortConfig.key === 'priority' && sortConfig.direction === 'asc' ? 'rotate(180deg)' : 'none' }} />
+                </div>
+              </TableHead>
+              <TableHead style={{ textAlign: 'center', color: '#166534', fontWeight: 800, fontSize: '0.75rem' }}>PROJECT STATUS</TableHead>
+              <TableHead style={{ textAlign: 'center', color: '#166534', fontWeight: 800, fontSize: '0.75rem' }}>TOTAL PROJECT COST</TableHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredData.length === 0 && (
+            {processedData?.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} style={{ textAlign: 'center', padding: '4.5rem', color: 'var(--muted-foreground)' }}>
+                <TableCell colSpan={6} style={{ textAlign: 'center', padding: '4.5rem', color: 'var(--muted-foreground)' }}>
                   <Folder size={32} style={{ opacity: 0.15, marginBottom: '1.25rem' }} />
-                  <p>{searchQuery ? "No projects match your search." : "No projects found in this registry. Initialise a project instance to begin tracking."}</p>
+                  <p>{searchQuery ? "No projects match your search." : "No projects found."}</p>
                 </TableCell>
               </TableRow>
             )}
 
             {paddingTop > 0 && (
               <tr style={{ height: `${paddingTop}px`, border: 'none' }}>
-                <td colSpan={4} style={{ padding: 0, border: 0 }}>
-                  <div style={{ height: `${paddingTop}px` }} />
-                </td>
+                <td colSpan={6} style={{ padding: 0, border: 0 }}></td>
               </tr>
             )}
 
             {virtualRows.map((virtualRow) => {
-              const p = filteredData[virtualRow.index];
-              const statusColors = getStatusColor(p.status);
+              const p = processedData[virtualRow.index];
+              const pFacility = facilities.find(f => f.id === p.facilityId);
+              const pColor = getPriorityColor(p.priority);
+              const sColor = getStatusColor(p.status);
+              
               return (
-              <TableRow key={p.id} ref={rowVirtualizer.measureElement} data-index={virtualRow.index}>
-                <TableCell>
-                  <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--primary)' }}>{p.name}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>Ref: {p.id.substring(0, 8)}...</div>
+              <TableRow 
+                key={p.id} 
+                ref={rowVirtualizer.measureElement} 
+                data-index={virtualRow.index} 
+                style={{ borderBottom: '1px solid #e4e4e7', cursor: 'pointer' }}
+                onClick={() => navigate(`/schedules?projectId=${p.id}`)}
+                className="hover:bg-muted/50"
+              >
+                <TableCell style={{ textAlign: 'center', fontWeight: 800, fontSize: '1.1rem', color: '#092e20' }}>
+                  {p.projectCode || '---'}
                 </TableCell>
                 <TableCell>
-                  <span style={{ fontSize: '0.725rem', fontWeight: 750, padding: '0.35rem 0.75rem', borderRadius: '0.5rem', backgroundColor: statusColors.bg, color: statusColors.text, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: statusColors.text }}></div>
-                    {p.status}
-                  </span>
+                  <div style={{ fontWeight: 800, fontSize: '1.15rem', color: '#092e20', marginBottom: '0.15rem' }}>{p.name}</div>
+                  <div style={{ fontSize: '0.8rem', color: '#52525b', fontWeight: 500 }}>
+                    {pFacility ? `${pFacility.name} (${pFacility.id?.substring(0,6).toUpperCase()})` : 'Unknown Facility'}
+                  </div>
+                  {p.description && (
+                    <div style={{ fontSize: '0.75rem', color: '#a1a1aa', marginTop: '0.2rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      {p.description}
+                    </div>
+                  )}
                 </TableCell>
-                <TableCell style={{ textAlign: 'right', fontWeight: 700, color: 'var(--foreground)' }}>
-                  ₱{(p.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                <TableCell style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                  <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                    <select
+                      value={p.priority || 'Medium'}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => handleInlinePriorityChange(e, p, e.target.value)}
+                      style={{
+                        appearance: 'none',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        padding: '0.3rem 1.6rem 0.3rem 0.7rem',
+                        borderRadius: '0.2rem',
+                        backgroundColor: pColor.bg,
+                        color: pColor.text,
+                        border: 'none',
+                        outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                        <option value="Low">Low</option>
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
+                        <option value="Very High">Very High</option>
+                    </select>
+                    <ChevronDown size={14} style={{ position: 'absolute', right: '0.4rem', pointerEvents: 'none', color: pColor.text, opacity: 0.8 }} />
+                  </div>
                 </TableCell>
-                <TableCell style={{ textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center' }}>
-                  <Button variant="ghost" size="sm" onClick={() => navigate(`/schedules?projectId=${p.id}`)}>
-                    Open Logs
-                    <ArrowRight size={14} />
-                  </Button>
+                <TableCell style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                  <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                    <select
+                      value={p.status || 'Planning Phase'}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => handleInlineStatusChange(e, p, e.target.value)}
+                      style={{
+                        appearance: 'none',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        padding: '0.3rem 1.6rem 0.3rem 0.7rem',
+                        borderRadius: '0.2rem',
+                        backgroundColor: sColor.bg,
+                        color: sColor.text,
+                        border: 'none',
+                        outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                        <option value="Accepted">Accepted</option>
+                        <option value="Planning Phase">Planning Phase</option>
+                        <option value="On-Going">On-Going</option>
+                        <option value="On Review">On Review</option>
+                        <option value="For Submission">For Submission</option>
+                        <option value="Closed">Closed</option>
+                    </select>
+                    <ChevronDown size={14} style={{ position: 'absolute', right: '0.4rem', pointerEvents: 'none', color: sColor.text, opacity: 0.8 }} />
+                  </div>
+                </TableCell>
+                <TableCell style={{ textAlign: 'center', padding: '0.5rem' }}>
+                    <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#092e20' }}>
+                     Php {(p.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#a1a1aa', fontWeight: 500, marginTop: '0.1rem' }}>
+                     Php {(p.approvedBudget || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </div>
+                </TableCell>
+                <TableCell style={{ textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center', height: '100%' }}>
                   <button 
-                    onClick={() => {
-                      setEditingProject(p);
-                      setEditName(p.name);
-                      setEditStatus(p.status || 'Planning');
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingProject(p);
+                        setEditName(p.name || '');
+                        setEditDescription(p.description || '');
+                        setEditStatus(p.status || 'Planning Phase');
+                        setEditPriority(p.priority || 'Medium');
+                        const f = facilities.find(fac => fac.id === p.facilityId);
+                        setEditCampusId(f ? f.campusId : '');
+                      setEditFacilityId(p.facilityId || '');
+                      setEditTotalCost(String(p.totalCost ?? ''));
+                      setEditApprovedBudget(String(p.approvedBudget ?? ''));
                       setEditDialogOpen(true);
                     }}
-                    style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.5rem' }}
+                    style={{ background: 'none', border: 'none', color: '#d4d4d8', cursor: 'pointer', padding: '0.25rem' }}
                     title="Edit Project"
                   >
                     <Edit2 size={16} />
                   </button>
                   <button 
-                    onClick={() => handleDelete(p.id)}
-                    style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.5rem' }}
+                    onClick={(e) => handleDelete(e, p.id)}
+                    style={{ background: 'none', border: 'none', color: '#d4d4d8', cursor: 'pointer', padding: '0.25rem' }}
                     onMouseOver={(e) => e.currentTarget.style.color = 'var(--destructive)'}
-                    onMouseOut={(e) => e.currentTarget.style.color = '#a1a1aa'}
+                    onMouseOut={(e) => e.currentTarget.style.color = '#d4d4d8'}
                     title="Delete Project"
                   >
                     <Trash2 size={16} />
+                  </button>
+                  <button 
+                    onClick={(e) => handleDuplicate(e, p)}
+                    style={{ background: 'none', border: 'none', color: '#d4d4d8', cursor: 'pointer', padding: '0.25rem' }}
+                    title="Duplicate Project"
+                  >
+                    <Copy size={16} />
                   </button>
                 </TableCell>
               </TableRow>
@@ -250,9 +562,7 @@ export default function Projects() {
             
             {paddingBottom > 0 && (
               <tr style={{ height: `${paddingBottom}px`, border: 'none' }}>
-                <td colSpan={4} style={{ padding: 0, border: 0 }}>
-                  <div style={{ height: `${paddingBottom}px` }} />
-                </td>
+                <td colSpan={6} style={{ padding: 0, border: 0 }}></td>
               </tr>
             )}
           </TableBody>
@@ -260,25 +570,97 @@ export default function Projects() {
       </div>
 
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Edit Project</DialogTitle></DialogHeader>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
+        <DialogContent style={{ maxHeight: '90vh', overflowY: 'visible' }} onInteractOutside={(e) => e.preventDefault()}>
+          <DialogHeader><DialogTitle>Edit Project details</DialogTitle></DialogHeader>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1rem' }}>
+               <div style={{ display: 'flex', gap: '1rem' }}>
+                  <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Campus</label>
+                    <SelectCombo 
+                      value={editCampusId} 
+                      onChange={(val) => {
+                        setEditCampusId(val);
+                        setEditFacilityId('');
+                      }} 
+                      options={campuses.map(c => ({ value: c.id, label: c.name }))}
+                      placeholder="Select campus..."
+                    />
+                  </div>
+                  <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Facility Context</label>
+                    <SelectCombo 
+                      value={editFacilityId} 
+                      onChange={setEditFacilityId} 
+                      options={availableEditFacilities.map(f => ({ value: f.id, label: f.name }))}
+                      placeholder="Select facility..."
+                    />
+                  </div>
+                </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Project Name</label>
-              <Input placeholder="e.g. Roof Replacement 2024" value={editName} onChange={(e) => setEditName(e.target.value)} />
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Operational Status</label>
-              <Select 
-                value={editStatus} 
-                onChange={(e) => setEditStatus(e.target.value)}
-              >
-                <option value="Planning">Planning Phase</option>
-                <option value="Active">Operational / Active</option>
-                <option value="Completed">Project Completed</option>
-                <option value="On Hold">Strategically Paused</option>
-              </Select>
+              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Description</label>
+              <Input value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
             </div>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Priority</label>
+                <Select value={editPriority} onChange={(e) => setEditPriority(e.target.value)}>
+                    <option value="Low">Low - Light Blue</option>
+                    <option value="Medium">Medium - Green</option>
+                    <option value="High">High - Yellow</option>
+                    <option value="Very High">Very High - Red</option>
+                </Select>
+                </div>
+                <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
+                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Status</label>
+                 <Select value={editStatus} onChange={(e) => setEditStatus(e.target.value)}>
+                    <option value="Accepted">Accepted</option>
+                    <option value="Planning Phase">Planning Phase</option>
+                    <option value="On-Going">On-Going</option>
+                    <option value="On Review">On Review</option>
+                    <option value="For Submission">For Submission</option>
+                    <option value="Closed">Closed</option>
+                 </Select>
+                </div>
+            </div>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Total Cost</label>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={formatMoneyInput(editTotalCost)}
+                  onChange={(e) => setEditTotalCost(normalizeMoneyInput(e.target.value))}
+                />
+                </div>
+                <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Approved Budget</label>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={formatMoneyInput(editApprovedBudget)}
+                  onChange={(e) => setEditApprovedBudget(normalizeMoneyInput(e.target.value))}
+                />
+                </div>
+            </div>
+
+            {editingProject?.statusHistory && editingProject.statusHistory.length > 0 && (
+                <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+                    <label style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>Status History</label>
+                    <ul style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', listStyle: 'none', padding: 0 }}>
+                        {editingProject.statusHistory.map((sh, idx) => (
+                            <li key={idx} style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', display: 'flex', justifyContent: 'space-between', backgroundColor: '#f4f4f5', padding: '0.5rem', borderRadius: '0.25rem' }}>
+                                <strong>{sh.status}</strong>
+                                <span>{new Date(sh.changedAt).toLocaleString()}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
             <Button onClick={handleEdit} style={{ marginTop: '0.5rem' }}>Save Changes</Button>
           </div>
         </DialogContent>

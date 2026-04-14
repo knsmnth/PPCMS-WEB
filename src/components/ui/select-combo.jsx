@@ -101,7 +101,7 @@ export function SelectCombo({ options, value, onChange, placeholder = "Select...
       isDisabled={disabled}
       styles={{
         ...customStyles,
-        menuPortal: base => ({ ...base, zIndex: 9999 })
+        menuPortal: base => ({ ...base, zIndex: 9999, pointerEvents: 'auto' })
       }}
       isClearable={false}
       isSearchable={true}

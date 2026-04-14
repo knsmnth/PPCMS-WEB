@@ -54,7 +54,7 @@ export default function APIIntegrations() {
           </div>
           <div>
             <h1 style={{ fontSize: '2rem', fontWeight: 700, margin: 0, color: 'var(--foreground)' }}>API Integrations</h1>
-            <p style={{ color: 'var(--muted-foreground)', fontSize: '0.95rem', margin: '0.25rem 0 0 0' }}>Connect external systems to the PPOMS Master Data architecture.</p>
+            <p style={{ color: 'var(--muted-foreground)', fontSize: '0.95rem', margin: '0.25rem 0 0 0' }}>Connect external systems to the PPCMS Master Data architecture.</p>
           </div>
         </div>
 

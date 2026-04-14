@@ -15,20 +15,20 @@ export default function Login() {
           <div className="animate-fade-in">
             <div className={styles.brandLogo}>
               <Calculator size={44} color="#4ade80" />
-              PPOMS
+              PPCMS
             </div>
             <div className={styles.decorLine}></div>
           </div>
           <div className="animate-fade-in-delayed">
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1rem', color: 'white' }}>Precision in Construction.</h2>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1rem', color: 'white' }}>Precision in Planning & Costing.</h2>
             <p className={styles.brandSubtitle}>
-              The next generation Project Price & Operations Management System.
+              Project Program and Costing Management System.
               Built for offline-first reliability on any job site.
             </p>
           </div>
         </div>
         <div className="animate-fade-in-delayed">
-          <p style={{ fontSize: '0.8rem', opacity: 0.4, fontWeight: 500 }}>© {new Date().getFullYear()} PPOMS INFRASTRUCTURE DEEP-TECH.</p>
+          <p style={{ fontSize: '0.8rem', opacity: 0.4, fontWeight: 500 }}>© {new Date().getFullYear()} PPCMS INFRASTRUCTURE DEEP-TECH.</p>
         </div>
       </div>
 

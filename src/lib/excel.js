@@ -116,3 +116,69 @@ export async function parseProjectsExcel(file) {
   });
   return rows;
 }
+
+export async function exportSchedulesTemplate(projects, schedules = []) {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Schedules');
+
+  sheet.columns = [
+    { header: 'ID (Leave blank for new)', key: 'id', width: 35 },
+    { header: 'Work Name', key: 'name', width: 40 },
+    { header: 'Specifications', key: 'description', width: 50 },
+    { header: 'Project Name', key: 'project', width: 40 },
+  ];
+
+  sheet.getRow(1).font = { bold: true };
+
+  // Data Validation for Projects via hidden sheet
+  const dataSheet = workbook.addWorksheet('Data_Hidden', { state: 'hidden' });
+  projects.forEach((proj, i) => {
+    dataSheet.getCell(i + 1, 1).value = proj.name;
+  });
+
+  schedules.forEach(s => {
+    const proj = projects.find(p => p.id === s.projectId);
+    sheet.addRow({
+      id: s.id,
+      name: s.name,
+      description: s.description || '',
+      project: proj ? proj.name : ''
+    });
+  });
+
+  if (projects.length > 0) {
+    const projectFormula = `Data_Hidden!$A$1:$A$${projects.length}`;
+    const maxRows = Math.max(1000, sheet.rowCount + 500);
+    for (let rowNumber = 2; rowNumber <= maxRows; rowNumber++) {
+      sheet.getCell(`D${rowNumber}`).dataValidation = {
+        type: 'list',
+        allowBlank: false,
+        formulae: [projectFormula]
+      };
+    }
+  }
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  saveAs(new Blob([buffer]), 'schedules_export.xlsx');
+}
+
+export async function parseSchedulesExcel(file) {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(file);
+  const sheet = workbook.getWorksheet('Schedules');
+  if (!sheet) throw new Error("Could not find 'Schedules' sheet.");
+  
+  const rows = [];
+  sheet.eachRow((row, rowNumber) => {
+    if (rowNumber > 1) {
+      const values = row.values;
+      rows.push({
+        id: values[1]?.toString() || null,
+        name: values[2]?.toString() || '',
+        description: values[3]?.toString() || '',
+        projectName: values[4]?.toString() || ''
+      });
+    }
+  });
+  return rows;
+}

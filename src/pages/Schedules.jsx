@@ -7,9 +7,10 @@ import {
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
-import { Calendar, Plus, ArrowLeft, Edit2, Trash2, Search, GripVertical, Copy } from 'lucide-react';
+import { Calendar, Plus, ArrowLeft, Edit2, Trash2, Search, GripVertical, Copy, Download, Upload } from 'lucide-react';
 import { cascadeDelete, cascadeDuplicateSchedule } from '../lib/cascade';
 import { recomputeProjectCost } from '../lib/billing'; // ground-truth recompute
+import { exportSchedulesTemplate, parseSchedulesExcel } from '../lib/excel';
 import { SelectCombo } from '../components/ui/select-combo';
 
 // ─── Pure utility functions (no React deps) ──────────────────────────────────
@@ -448,6 +449,79 @@ export default function ProgramOfWorks() {
     // DOM style reset is done inside WorkRow's onDragEnd handler
   }, []);
 
+  const fileInputRef = useRef(null);
+
+  const handleExportExcel = async () => {
+    try {
+      await exportSchedulesTemplate(projects, works);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to export Excel.');
+    }
+  };
+
+  const handleImportExcel = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const rows = await parseSchedulesExcel(file);
+      let count = 0;
+      let currentWorks = [...works];
+
+      for (const row of rows) {
+        if (!row.name) continue;
+
+        const proj = projects.find(p => p.name === row.projectName);
+        const projectIdToSave = proj ? proj.id : projectId; // Fallback to current project if not found or blank
+
+        if (!projectIdToSave) continue; // Can't save without a project
+
+        if (row.id) {
+          const existing = currentWorks.find(w => w.id === row.id);
+          if (existing) {
+            const updated = {
+              ...existing,
+              name: row.name,
+              description: row.description,
+              projectId: projectIdToSave
+            };
+            await updateItem(updated);
+            currentWorks = currentWorks.map(w => w.id === row.id ? updated : w);
+            count++;
+          }
+        } else {
+          // Generate new workCode
+          const targetProject = projects.find(p => p.id === projectIdToSave);
+          const allTargetWorks = currentWorks.filter(w => w.projectId === projectIdToSave);
+          const wCode = nextWorkCode(targetProject?.projectCode ?? '', allTargetWorks);
+          const maxOrder = allTargetWorks.reduce((m, w) => Math.max(m, w.order ?? 0), -1);
+
+          const newWork = {
+            id: crypto.randomUUID(),
+            projectId: projectIdToSave,
+            workCode: wCode,
+            name: row.name,
+            description: row.description,
+            order: maxOrder + 1,
+            totalCost: 0,
+            isExcluded: false,
+            createdAt: new Date().toISOString()
+          };
+          await createItem(newWork);
+          currentWorks.push(newWork);
+          count++;
+        }
+      }
+      alert(`Successfully processed ${count} schedules.`);
+      refresh();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to import Excel. Ensure it matches the template.');
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   // ─── Empty / guard state ──────────────────────────────────────────────────
 
   if (!projectId) {
@@ -506,6 +580,16 @@ export default function ProgramOfWorks() {
               onChange={e => setSearchQuery(e.target.value)}
               style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', fontSize: '0.9rem', color: 'var(--foreground)' }}
             />
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <input type="file" accept=".xlsx" ref={fileInputRef} style={{ display: 'none' }} onChange={handleImportExcel} />
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()} title="Import Excel">
+              <Upload size={18} />
+            </Button>
+            <Button variant="outline" onClick={handleExportExcel} title="Export Excel Template">
+              <Download size={18} />
+            </Button>
           </div>
 
           <Button onClick={() => setCreateOpen(true)}>

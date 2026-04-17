@@ -30,7 +30,7 @@ const dashboardItem = [
 
 const operationsItems = [
   { name: 'Projects', path: '/projects', icon: Folder, type: 'nav' },
-  { name: 'Schedules of Work', path: '/schedules', icon: Calendar, type: 'dep' },
+  { name: 'Program of Works', path: '/schedules', icon: Calendar, type: 'dep' },
   { name: 'Summary Workspace', path: '/summary', icon: Calculator, type: 'dep' },
 ];
 
@@ -41,7 +41,7 @@ const locationItems = [
 
 const masterDataItems = [
   { name: 'Material Catalog', path: '/materials', icon: Package },
-  { name: 'Equipment Manager', path: '/equipments', icon: Wrench },
+
   { name: 'Labor Manager', path: '/labor', icon: Users },
 ];
 

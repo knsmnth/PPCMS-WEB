@@ -55,10 +55,13 @@ export function useCollection(collectionName, queryConstraints = [], pageLimit =
     };
     window.addEventListener('localDataUpdated', handleLocalUpdate);
 
+    // 2. Real-time sync from Firestore
     let unsubscribe = null;
 
-    // 2. Real-time sync from Firestore ONLY when online
-    if (navigator.onLine) {
+    const setupSnapshot = () => {
+      // Don't setup duplicate listeners
+      if (unsubscribe || !navigator.onLine) return;
+
       let q = collection(db, collectionName);
       
       // Apply constraints
@@ -91,11 +94,21 @@ export function useCollection(collectionName, queryConstraints = [], pageLimit =
       }, (err) => {
          console.error(`onSnapshot error for ${collectionName}:`, err);
       });
-    }
+    };
+
+    // Try setting up immediately
+    setupSnapshot();
+
+    // Listen for connection restoration to attach listener if we started offline
+    const handleOnline = () => {
+      setupSnapshot();
+    };
+    window.addEventListener('online', handleOnline);
 
     return () => {
       if (unsubscribe) unsubscribe();
       window.removeEventListener('localDataUpdated', handleLocalUpdate);
+      window.removeEventListener('online', handleOnline);
     };
   }, [collectionName, JSON.stringify(queryConstraints), pageLimit]);
 

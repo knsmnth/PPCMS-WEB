@@ -109,18 +109,18 @@ export default function Projects() {
       result.sort((a, b) => {
         let aValue = a[sortConfig.key] || '';
         let bValue = b[sortConfig.key] || '';
-        
+
         if (['totalCost', 'approvedBudget'].includes(sortConfig.key)) {
-           aValue = Number(aValue);
-           bValue = Number(bValue);
-        } else {
-           aValue = aValue.toString().toLowerCase();
-           bValue = bValue.toString().toLowerCase();
+          aValue = Number(aValue);
+          bValue = Number(bValue);
+          if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+          if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+          return 0;
         }
 
-        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
+        // Natural / locale-aware sort for all string keys (handles YY.NNN codes correctly)
+        const cmp = aValue.toString().localeCompare(bValue.toString(), undefined, { numeric: true, sensitivity: 'base' });
+        return sortConfig.direction === 'asc' ? cmp : -cmp;
       });
     }
 
@@ -327,7 +327,7 @@ export default function Projects() {
                       }} 
                       options={campuses.map(c => ({ value: c.id, label: c.name }))}
                       placeholder="Select campus..."
-                      disabled={!!facilityId}
+                      disabled={false}
                     />
                   </div>
                   <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
@@ -337,7 +337,7 @@ export default function Projects() {
                       onChange={setSelectedFacilityId} 
                       options={availableFacilities.map(f => ({ value: f.id, label: f.name }))}
                       placeholder="Select facility..."
-                      disabled={!!facilityId || !selectedCampusId}
+                      disabled={!selectedCampusId}
                     />
                   </div>
                 </div>
@@ -390,24 +390,24 @@ export default function Projects() {
         </div>
       </header>
 
-      <div ref={parentRef} style={{ maxHeight: '600px', overflow: 'auto', borderRadius: '0.5rem', border: '1px solid #d4d4d8', backgroundColor: 'white' }}>
+      <div ref={parentRef} style={{ maxHeight: '600px', overflow: 'auto', borderRadius: 'var(--radius)', border: '1px solid var(--border)', backgroundColor: 'var(--background)' }}>
         <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
-          <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'white', borderBottom: '1px solid #d4d4d8' }}>
+          <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'var(--background)', borderBottom: '1px solid var(--border)' }}>
             <TableRow>
-              <TableHead onClick={() => handleSort('projectCode')} style={{ cursor: 'pointer', textAlign: 'center', width: '120px', color: '#166534', fontWeight: 800, fontSize: '0.75rem' }}>
+              <TableHead onClick={() => handleSort('projectCode')} style={{ cursor: 'pointer', textAlign: 'center', width: '120px', fontWeight: 700, fontSize: '0.75rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
-                  PROJECT CODE <ChevronDown size={14} style={{ opacity: 0.5, transform: sortConfig.key === 'projectCode' && sortConfig.direction === 'asc' ? 'rotate(180deg)' : 'none' }} />
+                  PROJECT CODE <ChevronDown size={14} style={{ opacity: 0.5, transition: 'transform 0.2s', transform: sortConfig.key === 'projectCode' && sortConfig.direction === 'asc' ? 'rotate(180deg)' : 'rotate(0deg)' }} />
                 </div>
               </TableHead>
-              <TableHead style={{ color: '#166534', fontWeight: 800, fontSize: '0.75rem', width: '35%' }}>PROJECT NAME & DESCRIPTION</TableHead>
-              <TableHead onClick={() => handleSort('priority')} style={{ cursor: 'pointer', textAlign: 'center', color: '#166534', fontWeight: 800, fontSize: '0.75rem' }}>
-                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
-                  PROJECT PRIORITY <ChevronDown size={14} style={{ opacity: 0.5, transform: sortConfig.key === 'priority' && sortConfig.direction === 'asc' ? 'rotate(180deg)' : 'none' }} />
+              <TableHead style={{ fontWeight: 700, fontSize: '0.75rem', width: '35%' }}>PROJECT NAME &amp; DESCRIPTION</TableHead>
+              <TableHead onClick={() => handleSort('priority')} style={{ cursor: 'pointer', textAlign: 'center', fontWeight: 700, fontSize: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
+                  PROJECT PRIORITY <ChevronDown size={14} style={{ opacity: 0.5, transition: 'transform 0.2s', transform: sortConfig.key === 'priority' && sortConfig.direction === 'asc' ? 'rotate(180deg)' : 'rotate(0deg)' }} />
                 </div>
               </TableHead>
-              <TableHead style={{ textAlign: 'center', color: '#166534', fontWeight: 800, fontSize: '0.75rem' }}>PROJECT STATUS</TableHead>
-              <TableHead style={{ textAlign: 'center', color: '#166534', fontWeight: 800, fontSize: '0.75rem' }}>TOTAL PROJECT COST</TableHead>
-              <TableHead></TableHead>
+              <TableHead style={{ textAlign: 'center', fontWeight: 700, fontSize: '0.75rem' }}>PROJECT STATUS</TableHead>
+              <TableHead style={{ textAlign: 'center', fontWeight: 700, fontSize: '0.75rem' }}>TOTAL PROJECT COST</TableHead>
+              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -437,7 +437,7 @@ export default function Projects() {
                 key={p.id} 
                 ref={rowVirtualizer.measureElement} 
                 data-index={virtualRow.index} 
-                style={{ borderBottom: '1px solid #e4e4e7', cursor: 'pointer' }}
+                style={{ cursor: 'pointer' }}
                 onClick={() => navigate(`/schedules?projectId=${p.id}`)}
                 className="hover:bg-muted/50"
               >
@@ -512,11 +512,11 @@ export default function Projects() {
                   </div>
                 </TableCell>
                 <TableCell style={{ textAlign: 'center', padding: '0.5rem' }}>
-                    <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#092e20' }}>
-                     Php {(p.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--primary)' }}>
+                     ₱{(p.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </div>
-                    <div style={{ fontSize: '0.8rem', color: '#a1a1aa', fontWeight: 500, marginTop: '0.1rem' }}>
-                     Php {(p.approvedBudget || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    <div style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', fontWeight: 500, marginTop: '0.1rem' }}>
+                     Budget: ₱{(p.approvedBudget || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </div>
                 </TableCell>
                 <TableCell style={{ textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center', height: '100%' }}>
@@ -535,14 +535,14 @@ export default function Projects() {
                       setEditApprovedBudget(String(p.approvedBudget ?? ''));
                       setEditDialogOpen(true);
                     }}
-                    style={{ background: 'none', border: 'none', color: '#d4d4d8', cursor: 'pointer', padding: '0.25rem' }}
+                    style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.25rem' }}
                     title="Edit Project"
                   >
                     <Edit2 size={16} />
                   </button>
                   <button 
                     onClick={(e) => handleDelete(e, p.id)}
-                    style={{ background: 'none', border: 'none', color: '#d4d4d8', cursor: 'pointer', padding: '0.25rem' }}
+                    style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.25rem' }}
                     onMouseOver={(e) => e.currentTarget.style.color = 'var(--destructive)'}
                     onMouseOut={(e) => e.currentTarget.style.color = '#d4d4d8'}
                     title="Delete Project"
@@ -551,7 +551,7 @@ export default function Projects() {
                   </button>
                   <button 
                     onClick={(e) => handleDuplicate(e, p)}
-                    style={{ background: 'none', border: 'none', color: '#d4d4d8', cursor: 'pointer', padding: '0.25rem' }}
+                    style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.25rem' }}
                     title="Duplicate Project"
                   >
                     <Copy size={16} />

@@ -10,7 +10,7 @@
  *                       └── scheduleSummaries  (summary.scheduleOfWorkId)
  *                             └── summaryItems  (item.summaryId)
  *
- * Reference stores (no parent):  materials | equipments | laborTypes
+ * Reference stores (no parent):  materials | laborTypes
  *
  * Scopes for export / upload / download:
  *   'all'      → every store
@@ -46,7 +46,7 @@ const PAGE_SIZE = 500;
 const BACKUP_VERSION = 2;
 
 /** Reference stores — always included in every scope. */
-const REFERENCE_STORES = ['materials', 'equipments', 'laborTypes'];
+const REFERENCE_STORES = ['materials', 'laborTypes'];
 
 export const SCOPE_OPTIONS = [
   { value: 'all',      label: 'Everything',               description: 'All stores — full backup' },

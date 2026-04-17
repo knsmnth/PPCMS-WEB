@@ -185,13 +185,6 @@ export function MaterialCatalog() {
   ]} />;
 }
 
-export function EquipmentManager() {
-  return <MasterDataManager title="Equipment Registry" collectionName="equipments" icon={Wrench} fields={[
-    { name: 'name', label: 'Equipment Model' },
-    { name: 'specs', label: 'Performance Specs' },
-    { name: 'currentPrice', label: 'Daily Rental / Rate (₱)', type: 'number' }
-  ]} />;
-}
 
 export function LaborManager() {
   return <MasterDataManager title="Human Capital" collectionName="laborTypes" icon={Users} fields={[

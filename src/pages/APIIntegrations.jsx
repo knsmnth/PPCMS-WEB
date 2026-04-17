@@ -10,11 +10,7 @@ const endpoints = [
     description: 'Fetch the central repository of construction materials and their current pricing.',
     url: `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/materials`
   },
-  {
-    name: 'Equipment Roster',
-    description: 'Fetch the active fleet of equipment and daily rental rates.',
-    url: `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/equipments`
-  },
+
   {
     name: 'Labor Rates',
     description: 'Fetch standard labor classifications and their daily wages.',
@@ -174,40 +170,8 @@ export default function APIIntegrations() {
 }`}</code>
               </pre>
 
-              <h5 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '0.25rem', marginTop: '1.5rem' }}>Example B: Equipment Structure</h5>
-              <pre style={{ background: 'rgba(0,0,0,0.04)', padding: '1rem', borderRadius: '8px', overflowX: 'auto', margin: 0, fontSize: '0.85rem' }}>
-                <code className="language-json">{`{
-  "documents": [
-    {
-      "name": "projects/\${FIREBASE_PROJECT_ID}/databases/(default)/documents/equipments/e3e378e5-fe61...",
-      "fields": {
-        "updatedAt": { "stringValue": "2026-03-22T14:10:24.186Z" },
-        "createdAt": { "stringValue": "2026-03-22T03:26:24.843Z" },
-        "name": { "stringValue": "TV" },
-        "currentPrice": { "integerValue": "1000" },
-        "id": { "stringValue": "e3e378e5-fe61-424f-8768-7165436e9039" },
-        "specs": { "stringValue": "Devant" },
-        "priceHistory": {
-          "arrayValue": {
-            "values": [
-              {
-                "mapValue": {
-                  "fields": {
-                    "date": { "stringValue": "2026-03-22T14:10:24.186Z" },
-                    "price": { "integerValue": "1000" }
-                  }
-                }
-              }
-            ]
-          }
-        }
-      }
-    }
-  ]
-}`}</code>
-              </pre>
 
-              <h5 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '0.25rem', marginTop: '1.5rem' }}>Example C: Labor Structure</h5>
+              <h5 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '0.25rem', marginTop: '1.5rem' }}>Example B: Labor Structure</h5>
               <pre style={{ background: 'rgba(0,0,0,0.04)', padding: '1rem', borderRadius: '8px', overflowX: 'auto', margin: 0, fontSize: '0.85rem' }}>
                 <code className="language-json">{`{
   "documents": [

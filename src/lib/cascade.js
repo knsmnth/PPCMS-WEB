@@ -130,3 +130,52 @@ export const cascadeDuplicateProject = async ({ sourceProjectId, newProjectPaylo
     }
   }
 };
+
+export const cascadeDuplicateSchedule = async ({ sourceScheduleId, newSchedulePayload }) => {
+  // Always use full-scan fallback — index queries return empty silently when
+  // data was Firestore-synced but the IDB index is not yet populated.
+  await executeCreate('schedulesOfWork', newSchedulePayload);
+
+  const allSummaries = await getAllFromDB('scheduleSummaries');
+  const summaries = allSummaries.filter(s => s.scheduleOfWorkId === sourceScheduleId);
+
+  let newScheduleTotalCost = 0;
+
+  for (const summary of summaries) {
+    const newSummaryId = crypto.randomUUID();
+
+    // Fetch items for this summary via full scan (same reliability reason)
+    const allItems = await getAllFromDB('summaryItems');
+    const items = allItems.filter(i => i.summaryId === summary.id);
+
+    // Copy items first so we can recompute the summary's actual totalCost
+    let summaryTotal = 0;
+    for (const item of items) {
+      await executeCreate('summaryItems', {
+        ...item,
+        id: crypto.randomUUID(),
+        summaryId: newSummaryId,
+        createdAt: new Date().toISOString(),
+      });
+      summaryTotal += item.totalCost || 0;
+    }
+
+    await executeCreate('scheduleSummaries', {
+      ...summary,
+      id: newSummaryId,
+      scheduleOfWorkId: newSchedulePayload.id,
+      totalCost: summaryTotal,
+      createdAt: new Date().toISOString(),
+    });
+
+    newScheduleTotalCost += summaryTotal;
+  }
+
+  // Patch the new schedule's totalCost to reflect copied summaries and notify UI
+  if (newScheduleTotalCost > 0) {
+    const updatedSchedule = { ...newSchedulePayload, totalCost: newScheduleTotalCost };
+    await putToDB('schedulesOfWork', updatedSchedule);
+    await addToSyncQueue({ type: 'update', collection: 'schedulesOfWork', payload: updatedSchedule });
+    notifyUpdate('schedulesOfWork'); // ← critical: triggers UI re-read immediately
+  }
+};

@@ -33,7 +33,6 @@ export default function SummaryWorkspace() {
   const { data: items, createItem: createSummaryItem, updateItem: updateSummaryItem, deleteItem: deleteSummaryItem } = useCollection('summaryItems');
   
   const { data: materials } = useCollection('materials');
-  const { data: equipments } = useCollection('equipments');
   const { data: labor } = useCollection('laborTypes');
   
   const { data: allSchedules } = useCollection('schedulesOfWork');
@@ -77,7 +76,7 @@ export default function SummaryWorkspace() {
   };
 
   const MasterDataSelector = ({ type, onSelect, selectedId }) => {
-    const list = type === 'material' ? materials : type === 'equipment' ? equipments : labor;
+    const list = type === 'material' ? materials : labor;
     const options = list.map(i => ({
       value: i.id,
       label: `${i.name} - ₱${(Number(i.currentPrice) || Number(i.currentRate) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
@@ -100,7 +99,7 @@ export default function SummaryWorkspace() {
   const getIcon = (type) => {
     switch (type) {
       case 'material': return <Package size={16} />;
-      case 'equipment': return <Wrench size={16} />;
+
       case 'labor': return <Users size={16} />;
       default: return <Calculator size={16} />;
     }
@@ -113,9 +112,9 @@ export default function SummaryWorkspace() {
       <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '1rem', color: 'var(--muted-foreground)' }}>
         <Calculator size={48} style={{ opacity: 0.2 }} />
         <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)' }}>Context Required</h2>
-        <p>Please select a specific Phase Schedule to view its financial Summary Workspace.</p>
+        <p>Please select a specific Program of Works to view its financial Summary Workspace.</p>
         <Button onClick={() => navigate('/schedules')} variant="outline" style={{ marginTop: '1rem' }}>
-          Return to Schedules
+          Return to Program of Works
         </Button>
       </div>
     );
@@ -129,7 +128,7 @@ export default function SummaryWorkspace() {
             onClick={() => navigate(`/schedules${scheduleContext ? `?projectId=${scheduleContext.projectId}` : ''}`)}
             style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.8rem', cursor: 'pointer', marginBottom: '0.5rem', fontWeight: 600 }}
           >
-            <ArrowLeft size={14} /> Back to Schedules
+            <ArrowLeft size={14} /> Back to Program of Works
           </button>
           <h1 style={{ fontSize: '1.875rem', fontWeight: 800, color: 'var(--primary)', letterSpacing: '-0.03em' }}>Workspace Summary</h1>
           <p style={{ color: 'var(--muted-foreground)', fontSize: '0.925rem', marginTop: '0.25rem' }}>Management of individual cost items and material acquisitions.</p>
@@ -152,7 +151,7 @@ export default function SummaryWorkspace() {
                   onChange={(e) => setSummaryType(e.target.value)}
                 >
                   <option value="material">Material Assets</option>
-                  <option value="equipment">Equipment Operations</option>
+
                   <option value="labor">Personnel & Labor</option>
                 </Select>
               </div>
@@ -170,7 +169,7 @@ export default function SummaryWorkspace() {
         <div style={{ textAlign: 'center', padding: '6rem', backgroundColor: '#fff', borderRadius: 'var(--radius)', border: '2px dashed var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', color: 'var(--muted-foreground)' }}>
           <LayoutGrid size={48} style={{ opacity: 0.1, marginBottom: '1.5rem' }} />
           <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--primary)' }}>No Cost Groups Defined</h3>
-          <p style={{ maxWidth: '400px', margin: '0.5rem auto 1.5rem auto' }}>Cost groups allow you to organize materials, equipment, and labor into logical project buckets.</p>
+          <p style={{ maxWidth: '400px', margin: '0.5rem auto 1.5rem auto' }}>Cost groups allow you to organize materials and labor into logical project buckets.</p>
           <Button variant="outline" onClick={() => setIsDialogOpen(true)}>Create your first group</Button>
         </div>
       )}
@@ -251,7 +250,7 @@ export default function SummaryWorkspace() {
                 onChange={(e) => setEditSummaryType(e.target.value)}
               >
                 <option value="material">Material Assets</option>
-                <option value="equipment">Equipment Operations</option>
+
                 <option value="labor">Personnel & Labor</option>
               </Select>
             </div>

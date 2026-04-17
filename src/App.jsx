@@ -4,6 +4,7 @@ import { initDB } from './lib/db';
 import { Sidebar } from './components/layout/sidebar';
 import { useAuth } from './hooks/useAuth';
 import { useOfflineSync } from './hooks/useOfflineSync';
+import { useCollisionResolver } from './hooks/useCollisionResolver';
 import { ConnectivityBadge } from './components/ui/connectivity-badge';
 import styles from './components/layout/layout.module.css';
 
@@ -15,7 +16,7 @@ import Facilities from './pages/Facilities';
 import Projects from './pages/Projects';
 import Schedules from './pages/Schedules';
 import SummaryWorkspace from './pages/SummaryWorkspace';
-import { MaterialCatalog, EquipmentManager, LaborManager } from './pages/MasterData';
+import { MaterialCatalog, LaborManager } from './pages/MasterData';
 import AccessDenied from './pages/AccessDenied';
 import AccessManagement from './pages/AccessManagement';
 import APIIntegrations from './pages/APIIntegrations';
@@ -24,6 +25,7 @@ import DataManagement from './pages/DataManagement';
 function AuthenticatedApp() {
   const { user } = useAuth();
   useOfflineSync(); 
+  useCollisionResolver();
   
   if (!user?.role || user.role === 'none') {
     return <AccessDenied />;
@@ -51,7 +53,7 @@ function AuthenticatedApp() {
             <Route path="/schedules" element={<Schedules />} />
             <Route path="/summary" element={<SummaryWorkspace />} />
             <Route path="/materials" element={<MaterialCatalog />} />
-            <Route path="/equipments" element={<EquipmentManager />} />
+
             <Route path="/labor" element={<LaborManager />} />
             {user.role === 'super_admin' && (
               <>

@@ -11,7 +11,7 @@ export const ALL_STORES = [
   'scheduleSummaries',
   'summaryItems',
   'materials',
-  'equipments',
+
   'laborTypes',
 ];
 
@@ -75,9 +75,7 @@ export async function initDB() {
       if (!db.objectStoreNames.contains('materials')) {
         db.createObjectStore('materials', { keyPath: 'id' });
       }
-      if (!db.objectStoreNames.contains('equipments')) {
-        db.createObjectStore('equipments', { keyPath: 'id' });
-      }
+
       if (!db.objectStoreNames.contains('laborTypes')) {
         db.createObjectStore('laborTypes', { keyPath: 'id' });
       }

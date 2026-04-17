@@ -21,33 +21,45 @@ const saveAndNotify = async (collection, record) => {
 
 // ─── Delta cascade (item add / remove inside a summary) ───────────────────────
 
-/**
- * Applies a cost delta starting from a summary, propagating upward through
- * schedule → project → facility → campus.
- *
- * Usage: cascadeCostUpdate(500, 'summaryId123')
- */
-export async function cascadeCostUpdate(deltaCost, scheduleSummaryId) {
-  if (deltaCost === 0) return;
+export async function recomputeSummaryCost(summaryId) {
+  if (!summaryId) return;
   try {
-    // 1. Summary
-    const summary = await getFromDB('scheduleSummaries', scheduleSummaryId);
+    const allItems = await getAllFromDB('summaryItems');
+    const summaryTotal = allItems
+      .filter(i => i.summaryId === summaryId && !i.isExcluded)
+      .reduce((sum, i) => sum + (i.totalCost || 0), 0);
+
+    const summary = await getFromDB('scheduleSummaries', summaryId);
     if (!summary) return;
-    await saveAndNotify('scheduleSummaries', { ...summary, totalCost: (summary.totalCost || 0) + deltaCost });
+    await saveAndNotify('scheduleSummaries', { ...summary, totalCost: summaryTotal });
 
-    // 2. Schedule of Work
-    const sched = await getFromDB('schedulesOfWork', summary.scheduleOfWorkId);
-    if (!sched) return;
-    await saveAndNotify('schedulesOfWork', { ...sched, totalCost: (sched.totalCost || 0) + deltaCost });
-
-    // 3–5. Recompute project / facility / campus from ground truth
-    await recomputeProjectCost(sched.projectId);
-
-    console.log('[Billing] Cost delta cascaded:', deltaCost);
-    triggerSync();
+    await recomputeScheduleCost(summary.scheduleOfWorkId);
   } catch (err) {
-    console.error('[Billing] cascadeCostUpdate failed:', err);
+    console.error('[Billing] recomputeSummaryCost failed:', err);
   }
+}
+
+export async function recomputeScheduleCost(scheduleId) {
+  if (!scheduleId) return;
+  try {
+    const allSummaries = await getAllFromDB('scheduleSummaries');
+    const schedTotal = allSummaries
+      .filter(s => s.scheduleOfWorkId === scheduleId && !s.isExcluded)
+      .reduce((sum, s) => sum + (s.totalCost || 0), 0);
+
+    const sched = await getFromDB('schedulesOfWork', scheduleId);
+    if (!sched) return;
+    await saveAndNotify('schedulesOfWork', { ...sched, totalCost: schedTotal });
+
+    await recomputeProjectCost(sched.projectId);
+  } catch (err) {
+    console.error('[Billing] recomputeScheduleCost failed:', err);
+  }
+}
+
+export async function cascadeCostUpdate(deltaCost, scheduleSummaryId) {
+  // Backwards compatibility wrapper
+  await recomputeSummaryCost(scheduleSummaryId);
 }
 
 // ─── Ground-truth recomputation ───────────────────────────────────────────────

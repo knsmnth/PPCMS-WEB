@@ -130,7 +130,7 @@ export default function SummaryWorkspace() {
           >
             <ArrowLeft size={14} /> Back to Program of Works
           </button>
-          <h1 style={{ fontSize: '1.875rem', fontWeight: 800, color: 'var(--primary)', letterSpacing: '-0.03em' }}>Workspace Summary</h1>
+          <h1 style={{ fontSize: '1.875rem', fontWeight: 800, color: 'var(--primary)', letterSpacing: '-0.03em' }}>Schedule of Works</h1>
           <p style={{ color: 'var(--muted-foreground)', fontSize: '0.925rem', marginTop: '0.25rem' }}>Management of individual cost items and material acquisitions.</p>
         </div>
         
@@ -138,11 +138,11 @@ export default function SummaryWorkspace() {
           <DialogTrigger asChild>
             <Button>
               <Plus size={18} />
-              Add Cost Group
+              Add New Work
             </Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>Categorize Cost Group</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>Categorize New Work</DialogTitle></DialogHeader>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Group Classification</label>
@@ -168,9 +168,9 @@ export default function SummaryWorkspace() {
       {summaries.length === 0 && (
         <div style={{ textAlign: 'center', padding: '6rem', backgroundColor: '#fff', borderRadius: 'var(--radius)', border: '2px dashed var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', color: 'var(--muted-foreground)' }}>
           <LayoutGrid size={48} style={{ opacity: 0.1, marginBottom: '1.5rem' }} />
-          <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--primary)' }}>No Cost Groups Defined</h3>
+          <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--primary)' }}>No Work Defined</h3>
           <p style={{ maxWidth: '400px', margin: '0.5rem auto 1.5rem auto' }}>Cost groups allow you to organize materials and labor into logical project buckets.</p>
-          <Button variant="outline" onClick={() => setIsDialogOpen(true)}>Create your first group</Button>
+          <Button variant="outline" onClick={() => setIsDialogOpen(true)}>Create your first work group</Button>
         </div>
       )}
 
@@ -193,8 +193,21 @@ export default function SummaryWorkspace() {
                 </div>
               </div>
               <div style={{ textAlign: 'right', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '1rem', borderRight: '1px solid var(--border)', paddingRight: '1rem' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted-foreground)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={!!summary.isExcluded} 
+                      onChange={async () => {
+                        await updateSummary({ ...summary, isExcluded: !summary.isExcluded });
+                        await cascadeCostUpdate(0, summary.id);
+                      }} 
+                    />
+                    EXCLUDE GROUP
+                  </label>
+                </div>
                 <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.1rem' }}>CATEGORY TOTAL</div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.1rem' }}>TOTAL WORK COST</div>
                   <div style={{ fontWeight: 800, fontSize: '1.4rem', color: 'var(--primary)', letterSpacing: '-0.03em' }}>
                     ₱{(summary.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </div>
@@ -241,7 +254,7 @@ export default function SummaryWorkspace() {
 
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Edit Cost Group Component</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Edit Work Component</DialogTitle></DialogHeader>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Group Classification</label>
@@ -311,11 +324,12 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
         <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
           <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'var(--background)' }}>
             <TableRow>
-              <TableHead>Specification & Asset</TableHead>
-              <TableHead style={{ textAlign: 'center' }}>Qty</TableHead>
-              <TableHead style={{ textAlign: 'right' }}>Unit Rate</TableHead>
-              <TableHead style={{ textAlign: 'right' }}>Line Extension</TableHead>
-              <TableHead></TableHead>
+              <TableHead>Item Name</TableHead>
+              <TableHead style={{ textAlign: 'center', width: '120px' }}>Qty</TableHead>
+              <TableHead style={{ textAlign: 'center', width: '80px' }}>Unit</TableHead>
+              <TableHead style={{ textAlign: 'right' }}>Unit Price</TableHead>
+              <TableHead style={{ textAlign: 'right' }}>Total Item Cost</TableHead>
+              <TableHead style={{ textAlign: 'right', width: '80px' }}>Exclude</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -334,21 +348,49 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
                   key={item.id} 
                   ref={rowVirtualizer.measureElement}
                   data-index={virtualRow.index}
+                  style={{ opacity: item.isExcluded ? 0.4 : 1, transition: 'opacity 0.2s' }}
                 >
                   <TableCell>
                     <div style={{ fontWeight: 700, color: 'var(--foreground)' }}>{item.name}</div>
                     <div style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)' }}>PID: {item.id.substring(0, 8)}</div>
                   </TableCell>
-                  <TableCell style={{ textAlign: 'center', fontWeight: 600 }}>{item.quantity}</TableCell>
-                  <TableCell style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>₱{item.unitCostAtTimeOfAdding.toLocaleString()}</TableCell>
-                  <TableCell style={{ textAlign: 'right', fontWeight: 800, color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>
-                     ₱{item.totalCost.toLocaleString()}
+                  <TableCell style={{ textAlign: 'center', fontWeight: 600 }}>
+                    <Input 
+                      type="number" 
+                      value={item.quantity} 
+                      onChange={async (e) => {
+                        const newQty = Number(e.target.value);
+                        if (newQty >= 0) {
+                          const newTotalCost = item.unitCostAtTimeOfAdding * newQty;
+                          await updateSummaryItem({ ...item, quantity: newQty, totalCost: newTotalCost });
+                          await cascadeCostUpdate(0, summary.id);
+                        }
+                      }}
+                      style={{ width: '80px', height: '2rem', textAlign: 'center', padding: '0 0.25rem', margin: '0 auto' }} 
+                    />
                   </TableCell>
-                  <TableCell style={{ textAlign: 'right' }}>
+                  <TableCell style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
+                     {item.unit || '-'}
+                  </TableCell>
+                  <TableCell style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>₱{item.unitCostAtTimeOfAdding.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                  <TableCell style={{ textAlign: 'right', fontWeight: 800, color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>
+                     ₱{item.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </TableCell>
+                  <TableCell style={{ textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center', height: '100%' }}>
+                    <label title="Exclude this item" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={!!item.isExcluded} 
+                        onChange={async () => {
+                          await updateSummaryItem({ ...item, isExcluded: !item.isExcluded });
+                          await cascadeCostUpdate(0, summary.id);
+                        }} 
+                      />
+                    </label>
                     <button 
                       onClick={async () => {
                         await deleteSummaryItem(item.id);
-                        await cascadeCostUpdate(-item.totalCost, summary.id);
+                        await cascadeCostUpdate(0, summary.id);
                       }}
                       style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.5rem', transition: 'all 0.2s' }}
                       onMouseOver={(e) => e.currentTarget.style.color = 'var(--destructive)'}
@@ -386,21 +428,22 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
             
             if (existingItem) {
               const newQty = existingItem.quantity + quantity;
-              const newTotalCost = existingItem.totalCost + additionalCost;
+              const newTotalCost = existingItem.unitCostAtTimeOfAdding * newQty;
               
               await updateSummaryItem({
                 ...existingItem,
                 quantity: newQty,
                 totalCost: newTotalCost
               });
-              await cascadeCostUpdate(additionalCost, summary.id);
+              await cascadeCostUpdate(0, summary.id);
             } else {
-              const totalCost = additionalCost;
+              const totalCost = unitCost * quantity;
               const newItem = {
                 id: crypto.randomUUID(),
                 summaryId: summary.id,
                 referenceId: selectedMasterItem.id,
                 name: selectedMasterItem.name,
+                unit: selectedMasterItem.unit || '',
                 quantity,
                 unitCostAtTimeOfAdding: unitCost,
                 totalCost,
@@ -408,7 +451,7 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
               };
               
               await createSummaryItem(newItem);
-              await cascadeCostUpdate(totalCost, summary.id);
+              await cascadeCostUpdate(0, summary.id);
             }
           }} 
           MasterDataSelector={MasterDataSelector} 

@@ -5,8 +5,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '../components/ui/dialog';
-import { Folder, Plus, Edit2, Trash2, Search, Copy, ChevronDown, ArrowRight } from 'lucide-react';
+import { Folder, Plus, Edit2, Trash2, Search, Copy, ChevronDown, ArrowRight, Download, Upload } from 'lucide-react';
 import { cascadeDelete, cascadeDuplicateProject } from '../lib/cascade';
+import { exportProjectsTemplate, parseProjectsExcel } from '../lib/excel';
 import { SelectCombo } from '../components/ui/select-combo';
 import { Select } from '../components/ui/select';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -246,7 +247,77 @@ export default function Projects() {
         statusHistory: [{ status: project.status, changedAt: Date.now() }]
       }
     });
-    refresh();
+  };
+
+  const fileInputRef = useRef(null);
+
+  const handleExportExcel = async () => {
+    try {
+      await exportProjectsTemplate(campuses, facilities, processedData);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to export Excel.');
+    }
+  };
+
+  const handleImportExcel = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const rows = await parseProjectsExcel(file);
+      let count = 0;
+      let currentProjects = [...projects];
+      
+      for (const row of rows) {
+        if (!row.name) continue;
+        
+        const fac = facilities.find(f => f.name === row.facilityName);
+        const facilityIdToSave = fac ? fac.id : '';
+        
+        if (row.id) {
+          // Update existing
+          const existing = currentProjects.find(p => p.id === row.id);
+          if (existing) {
+            const updated = {
+              ...existing,
+              name: row.name,
+              description: row.description,
+              priority: row.priority,
+              status: row.status,
+              facilityId: facilityIdToSave
+            };
+            await updateItem(updated);
+            currentProjects = currentProjects.map(p => p.id === row.id ? updated : p);
+            count++;
+          }
+        } else {
+          // Create new
+          const pCode = generateProjectCode(currentProjects);
+          const newProject = {
+            id: crypto.randomUUID(),
+            projectCode: pCode,
+            name: row.name,
+            description: row.description,
+            priority: row.priority,
+            status: row.status,
+            facilityId: facilityIdToSave,
+            createdAt: new Date().toISOString(),
+            statusHistory: [{ status: row.status, changedAt: Date.now() }],
+            totalCost: 0
+          };
+          await createItem(newProject);
+          currentProjects.push(newProject);
+          count++;
+        }
+      }
+      alert(`Successfully processed ${count} projects.`);
+      refresh();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to import Excel. Ensure it matches the template.');
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const getPriorityColor = (level) => {
@@ -305,6 +376,15 @@ export default function Projects() {
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', fontSize: '0.9rem', color: 'var(--foreground)' }}
             />
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <input type="file" accept=".xlsx" ref={fileInputRef} style={{ display: 'none' }} onChange={handleImportExcel} />
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()} title="Import Excel">
+              <Upload size={18} />
+            </Button>
+            <Button variant="outline" onClick={handleExportExcel} title="Export Excel Template">
+              <Download size={18} />
+            </Button>
           </div>
           <Dialog>
             <DialogTrigger asChild>

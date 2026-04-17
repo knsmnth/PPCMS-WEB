@@ -14,7 +14,7 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
   
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
-  const [newPrice, setNewPrice] = useState('');
+  const [editFormData, setEditFormData] = useState({});
 
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [historyItem, setHistoryItem] = useState(null);
@@ -39,28 +39,33 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
     setFormData({});
   };
 
-  const handleUpdatePrice = async () => {
-    if (!selectedItem || !newPrice) return;
+  const handleUpdateRecord = async () => {
+    if (!selectedItem) return;
+    
     const isRate = fields.some(f => f.name === 'currentRate');
     const priceField = isRate ? 'currentRate' : 'currentPrice';
     
-    const updatedPrice = Number(newPrice);
-    const historyEntry = {
-      price: updatedPrice,
-      date: new Date().toISOString()
-    };
+    const currentPriceNum = Number(selectedItem[priceField] || 0);
+    const newPriceNum = Number(editFormData[priceField] || 0);
     
-    const currentHistory = selectedItem.priceHistory || [];
+    let historyUpdates = selectedItem.priceHistory || [];
+    
+    // Append to history ONLY if the price actually changed
+    if (newPriceNum !== currentPriceNum) {
+      const historyEntry = { price: newPriceNum, date: new Date().toISOString() };
+      historyUpdates = [historyEntry, ...historyUpdates];
+    }
     
     await updateItem({
       ...selectedItem,
-      [priceField]: updatedPrice,
-      priceHistory: [historyEntry, ...currentHistory]
+      ...editFormData,
+      [priceField]: newPriceNum,
+      priceHistory: historyUpdates
     });
     
     setUpdateDialogOpen(false);
     setSelectedItem(null);
-    setNewPrice('');
+    setEditFormData({});
   };
 
   const filteredData = data.filter(item => 
@@ -117,6 +122,7 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
           title={title} 
           Icon={Icon} 
           setSelectedItem={setSelectedItem} 
+          setEditFormData={setEditFormData}
           setUpdateDialogOpen={setUpdateDialogOpen} 
           setHistoryItem={setHistoryItem} 
           setHistoryDialogOpen={setHistoryDialogOpen} 
@@ -124,17 +130,24 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
         />
       </div>
 
-      {/* Update Price Dialog */}
+      {/* Update Record Dialog */}
       <Dialog open={updateDialogOpen} onOpenChange={setUpdateDialogOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Update Price / Rate</DialogTitle></DialogHeader>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
-            <p style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>Updating price for: <strong style={{color: 'var(--primary)'}}>{selectedItem?.name}</strong></p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>New Price (₱)</label>
-              <Input type="number" placeholder="Enter new amount" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} />
-            </div>
-            <Button onClick={handleUpdatePrice} style={{ marginTop: '0.5rem' }}>Save Update</Button>
+          <DialogHeader><DialogTitle>Edit Record</DialogTitle></DialogHeader>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
+            <p style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)', marginBottom: '-0.5rem' }}>Updating record for: <strong style={{color: 'var(--primary)'}}>{selectedItem?.name}</strong></p>
+            {fields.map(f => (
+              <div key={f.name} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>{f.label}</label>
+                <Input 
+                  type={f.type || 'text'}
+                  placeholder={`e.g. ${f.label}`} 
+                  value={editFormData[f.name] || ''} 
+                  onChange={(e) => setEditFormData({ ...editFormData, [f.name]: e.target.value })} 
+                />
+              </div>
+            ))}
+            <Button onClick={handleUpdateRecord} style={{ marginTop: '0.5rem' }}>Save Updates</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -176,11 +189,11 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
   );
 }
 
-export function MaterialCatalog() {
-  return <MasterDataManager title="Material Inventory" collectionName="materials" icon={Package} fields={[
+export function MaterialsDescriptionAndPrices() {
+  return <MasterDataManager title="Materials Description and Prices" collectionName="materials" icon={Package} fields={[
     { name: 'name', label: 'Asset Name' },
     { name: 'specs', label: 'Technical Specifications' },
-    { name: 'unit', label: 'Stock Unit' },
+    { name: 'unit', label: 'Item Code' },
     { name: 'currentPrice', label: 'Current Base Price (₱)', type: 'number' }
   ]} />;
 }
@@ -193,7 +206,7 @@ export function LaborManager() {
   ]} />;
 }
 
-export function VirtualizedMasterDataTable({ filteredData, fields, title, Icon, setSelectedItem, setUpdateDialogOpen, setHistoryItem, setHistoryDialogOpen, deleteItem }) {
+export function VirtualizedMasterDataTable({ filteredData, fields, title, Icon, setSelectedItem, setEditFormData, setUpdateDialogOpen, setHistoryItem, setHistoryDialogOpen, deleteItem }) {
   const parentRef = React.useRef(null);
 
   const rowVirtualizer = useVirtualizer({
@@ -254,9 +267,9 @@ export function VirtualizedMasterDataTable({ filteredData, fields, title, Icon, 
                 ))}
                 <TableCell style={{ textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                   <button 
-                    onClick={() => { setSelectedItem(item); setUpdateDialogOpen(true); }}
+                    onClick={() => { setSelectedItem(item); setEditFormData(item); setUpdateDialogOpen(true); }}
                     style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.5rem' }}
-                    title="Update Price"
+                    title="Edit Record"
                   >
                     <Edit2 size={16} />
                   </button>

@@ -40,7 +40,7 @@ const locationItems = [
 ];
 
 const masterDataItems = [
-  { name: 'Material Catalog', path: '/materials', icon: Package },
+  { name: 'Materials Description & Prices', path: '/materials', icon: Package },
 
   { name: 'Labor Manager', path: '/labor', icon: Users },
 ];

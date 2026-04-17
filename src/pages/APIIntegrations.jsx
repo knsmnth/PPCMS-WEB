@@ -6,7 +6,7 @@ const FIREBASE_PROJECT_ID = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'ppoms-b
 
 const endpoints = [
   {
-    name: 'Materials Catalog',
+    name: 'Materials Description and Prices',
     description: 'Fetch the central repository of construction materials and their current pricing.',
     url: `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/materials`
   },

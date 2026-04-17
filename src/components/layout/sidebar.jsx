@@ -169,14 +169,14 @@ export function Sidebar({ className }) {
                   <ShieldAlert className={styles.icon} />
                   <span className={styles.linkText}>Access Management</span>
                 </NavLink>
-                <NavLink
+                {/* <NavLink
                   to="/api-integrations"
                   className={({ isActive }) => clsx(styles.link, isActive && styles.link_active)}
                   title={isCollapsed ? 'API Integrations' : ''}
                 >
                   <Network className={styles.icon} />
                   <span className={styles.linkText}>API Integrations</span>
-                </NavLink>
+                </NavLink> */}
                 <NavLink
                   to="/data-management"
                   className={({ isActive }) => clsx(styles.link, isActive && styles.link_active)}

@@ -42,16 +42,36 @@ export async function recomputeSummaryCost(summaryId) {
 export async function recomputeScheduleCost(scheduleId) {
   if (!scheduleId) return;
   try {
+    const sched = await getFromDB('schedulesOfWork', scheduleId);
+    if (!sched) return;
+
+    // 1. Sum up all summaries directly attached to this schedule
     const allSummaries = await getAllFromDB('scheduleSummaries');
-    const schedTotal = allSummaries
+    const ownSummariesTotal = allSummaries
       .filter(s => s.scheduleOfWorkId === scheduleId && !s.isExcluded)
       .reduce((sum, s) => sum + (s.totalCost || 0), 0);
 
-    const sched = await getFromDB('schedulesOfWork', scheduleId);
-    if (!sched) return;
+    const allSchedules = await getAllFromDB('schedulesOfWork');
+    
+    // 2. If this is a main schedule, sum up the total cost of all its sub-schedules
+    let subsTotal = 0;
+    if (!sched.parentId) {
+      subsTotal = allSchedules
+        .filter(s => s.parentId === scheduleId && !s.isExcluded)
+        .reduce((sum, s) => sum + (s.totalCost || 0), 0);
+    }
+
+    const schedTotal = ownSummariesTotal + subsTotal;
     await saveAndNotify('schedulesOfWork', { ...sched, totalCost: schedTotal });
 
-    await recomputeProjectCost(sched.projectId);
+    // 3. Propagate up the hierarchy
+    if (sched.parentId) {
+      // If it's a sub-schedule, updating its cost must trigger an update on its main schedule
+      await recomputeScheduleCost(sched.parentId);
+    } else {
+      // If it's a main schedule, update the project cost
+      await recomputeProjectCost(sched.projectId);
+    }
   } catch (err) {
     console.error('[Billing] recomputeScheduleCost failed:', err);
   }
@@ -76,10 +96,10 @@ export async function cascadeCostUpdate(deltaCost, scheduleSummaryId) {
 export async function recomputeProjectCost(projectId) {
   if (!projectId) return;
   try {
-    // 1. Compute project total from non-excluded schedules
+    // 1. Compute project total from non-excluded MAIN schedules (sub-schedules are rolled up inside main schedules)
     const allSchedules = await getAllFromDB('schedulesOfWork');
     const projectTotal = allSchedules
-      .filter(s => s.projectId === projectId && !s.isExcluded)
+      .filter(s => s.projectId === projectId && !s.parentId && !s.isExcluded)
       .reduce((sum, s) => sum + (s.totalCost || 0), 0);
 
     const proj = await getFromDB('projects', projectId);

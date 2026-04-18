@@ -76,11 +76,26 @@ export function useCollection(collectionName, queryConstraints = [], pageLimit =
         const changes = snapshot.docChanges();
         
         for (const change of changes) {
-          const docData = change.doc.data();
+          const remoteDoc = change.doc.data();
+
           if (change.type === 'added' || change.type === 'modified') {
-            await putToDB(collectionName, docData);
+            // ── Last-Write-Wins Guard ──────────────────────────────────────────
+            // If we have a locally-written version that is NEWER than what
+            // Firebase is pushing back (stale echo from our own recent write),
+            // skip the overwrite so local state is not reverted.
+            const localDoc = await getFromDB(collectionName, remoteDoc.id);
+            if (localDoc) {
+              const localTs  = localDoc.updatedAt  || localDoc.createdAt  || '';
+              const remoteTs = remoteDoc.updatedAt || remoteDoc.createdAt || '';
+              if (localTs > remoteTs) {
+                // Local is fresher — Firebase is echoing an older version, skip it
+                continue;
+              }
+            }
+            await putToDB(collectionName, remoteDoc);
             requiresLocalUpdate = true;
           }
+
           if (change.type === 'removed') {
             await deleteFromDB(collectionName, change.doc.id);
             requiresLocalUpdate = true;

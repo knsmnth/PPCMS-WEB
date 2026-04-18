@@ -95,47 +95,14 @@ export function useCollisionResolver() {
           }
         }
 
-        // ─── 2. Resolve Schedule Order Collisions ──────────────────────────────
-        const byProject = {};
-        for (const s of schedules) {
-          if (!byProject[s.projectId]) byProject[s.projectId] = [];
-          byProject[s.projectId].push(s);
-        }
-
-        for (const projectId in byProject) {
-          const projSchedules = byProject[projectId];
-          const orders = projSchedules.map(s => s.order ?? 0);
-          const hasDuplicates = new Set(orders).size !== orders.length;
-
-          if (hasDuplicates) {
-            const sorted = [...projSchedules].sort((a, b) => {
-              const oA = a.order ?? 0;
-              const oB = b.order ?? 0;
-              if (oA !== oB) return oA - oB;
-              if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
-              return a.id.localeCompare(b.id);
-            });
-
-            const proj = tempProjects.find(p => p.id === projectId);
-            const pCode = proj?.projectCode || '';
-
-            for (let i = 0; i < sorted.length; i++) {
-              const item = sorted[i];
-              if (item.order !== i) {
-                const newWorkCode = pCode ? `${pCode}.${indexToLetter(i)}` : item.workCode;
-                const updatedSchedule = { ...item, order: i, workCode: newWorkCode, updatedAt: new Date().toISOString() };
-                await putToDB('schedulesOfWork', updatedSchedule);
-                await addToSyncQueue({ type: 'update', collection: 'schedulesOfWork', payload: updatedSchedule });
-                schedulesUpdated = true;
-              }
-            }
-          }
-        }
+        // ── NOTE: Schedule work-code / order resolution is intentionally removed ──
+        // Work codes and order compaction are now managed exclusively by Schedules.jsx,
+        // scoped strictly to the active project. A global sweep here caused cross-project
+        // corruption and race conditions with drag-and-drop. Do NOT add it back here.
 
         // Fire UI refresh strictly IF changes were actually made
         if (projectsUpdated) window.dispatchEvent(new CustomEvent('localDataUpdated', { detail: 'projects' }));
-        if (schedulesUpdated) window.dispatchEvent(new CustomEvent('localDataUpdated', { detail: 'schedulesOfWork' }));
-        if (projectsUpdated || schedulesUpdated) window.dispatchEvent(new Event('triggerSync'));
+        if (projectsUpdated) window.dispatchEvent(new Event('triggerSync'));
 
       } catch (err) {
         console.error('[Collision Resolver] Error during background sweep:', err);

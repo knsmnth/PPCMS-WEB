@@ -7,9 +7,9 @@ import {
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
-import { Calendar, Plus, ArrowLeft, Edit2, Trash2, Search, GripVertical, Copy, Download, Upload } from 'lucide-react';
+import { Calendar, Plus, ArrowLeft, Edit2, Trash2, Search, GripVertical, Copy, Download, Upload, ChevronDown, ChevronRight, CornerDownRight } from 'lucide-react';
 import { cascadeDelete, cascadeDuplicateSchedule } from '../lib/cascade';
-import { recomputeProjectCost } from '../lib/billing'; // ground-truth recompute
+import { recomputeProjectCost, recomputeScheduleCost } from '../lib/billing'; // ground-truth recompute
 import { exportSchedulesTemplate, parseSchedulesExcel } from '../lib/excel';
 import { SelectCombo } from '../components/ui/select-combo';
 
@@ -29,27 +29,96 @@ function indexToLetter(index) {
 }
 
 /**
- * Produces the next unused work-code for a project.
- *   Format: <projectCode>.<Letter>   e.g. "26.001.A", "26.001.B" …
+ * Generates the correct work code for a schedule or sub-schedule.
+ * For main schedules: <projectCode>.<Letter> (e.g., 26.001.A)
+ * For sub-schedules:  <parentWorkCode>.<Number> (e.g., 26.001.A.1)
  *
- * @param {string} projectCode  – e.g. "26.001"
- * @param {Array}  existing     – all schedulesOfWork for this project
+ * @param {string} projectCode    - The project code (e.g., "26.001")
+ * @param {string} parentWorkCode - The parent's work code if it's a sub-schedule (e.g., "26.001.A")
+ * @param {Array}  siblings       - Array of sibling works to determine next available letter/number
+ * @param {number} currentOrder   - If provided, forces the generation based on this order index
  */
-function nextWorkCode(projectCode, existing) {
-  if (!projectCode) return '';
-  const prefix = `${projectCode}.`;
-  const used = existing
-    .map(w => (w.workCode || '').startsWith(prefix) ? w.workCode.slice(prefix.length) : null)
-    .filter(Boolean);
+function generateWorkCode(projectCode, parentWorkCode, siblings, currentOrder = null) {
+  if (parentWorkCode) {
+    // Sub-schedule formatting: YY.NNN.A.1, YY.NNN.A.2
+    if (currentOrder !== null) {
+      return `${parentWorkCode}.${currentOrder + 1}`;
+    }
+    const maxOrder = siblings.reduce((m, w) => Math.max(m, w.order ?? 0), -1);
+    return `${parentWorkCode}.${maxOrder + 2}`;
+  } else {
+    // Main schedule formatting: YY.NNN.A, YY.NNN.B
+    if (!projectCode) return '';
+    const prefix = `${projectCode}.`;
+    
+    if (currentOrder !== null) {
+      return `${prefix}${indexToLetter(currentOrder)}`;
+    }
+    
+    const used = siblings
+      .map(w => (w.workCode || '').startsWith(prefix) ? w.workCode.slice(prefix.length) : null)
+      .filter(Boolean);
 
-  let i = 0;
-  while (used.includes(indexToLetter(i))) i++;
-  return prefix + indexToLetter(i);
+    let i = 0;
+    while (used.includes(indexToLetter(i))) i++;
+    return prefix + indexToLetter(i);
+  }
 }
 
 /** Re-index `order` on a reordered array. */
 function reindex(list) {
   return list.map((item, idx) => ({ ...item, order: idx }));
+}
+
+/**
+ * Pure function — computes the correct order & workCode for every schedule
+ * in a project from a single source-of-truth snapshot.
+ *
+ * Groups items by parentId tier, sorts each group by current order,
+ * assigns contiguous 0-based indices, and generates work codes top-down
+ * (root before children so parent codes are resolved first).
+ *
+ * @param {Array}  allWorks    - Full list of works for this project (no other projects)
+ * @param {string} projectCode - e.g. "26.001"
+ * @returns {Array} Only the items that need updating (order or workCode changed)
+ */
+function computeWorkCodeUpdates(allWorks, projectCode) {
+  if (!projectCode || !allWorks.length) return [];
+
+  // Build lookup maps
+  const resolvedCode = {};           // id -> final workCode
+  const updates = [];
+
+  // ── 1. Root-level schedules ────────────────────────────────────────────────
+  const roots = allWorks
+    .filter(w => !w.parentId)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  roots.forEach((item, idx) => {
+    const expected = `${projectCode}.${indexToLetter(idx)}`;
+    resolvedCode[item.id] = expected;
+    if (item.order !== idx || item.workCode !== expected) {
+      updates.push({ ...item, order: idx, workCode: expected });
+    }
+  });
+
+  // ── 2. Sub-schedules (children of root items) ──────────────────────────────
+  roots.forEach(parent => {
+    const parentCode = resolvedCode[parent.id];
+    const children = allWorks
+      .filter(w => w.parentId === parent.id)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+    children.forEach((item, idx) => {
+      const expected = `${parentCode}.${idx + 1}`;
+      resolvedCode[item.id] = expected;
+      if (item.order !== idx || item.workCode !== expected) {
+        updates.push({ ...item, order: idx, workCode: expected });
+      }
+    });
+  });
+
+  return updates;
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
@@ -155,7 +224,149 @@ const labelStyle = { fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-fo
 
 // ─── WorkRow ──────────────────────────────────────────────────
 
-function WorkRow({ work, idx, onDragStart, onDragOver, onDrop, onDragEnd, onNavigate, onToggleExclude, onDuplicate, onEdit, onDelete }) {
+function WorkGroup({ mainWork, subWorks, onDragStart, onDragOver, onDrop, onDragEnd, onNavigate, onToggleExclude, onDuplicate, onEdit, onDelete, onCreateSub }) {
+  const [expanded, setExpanded] = useState(true); // open by default
+  const hasSubs = subWorks.length > 0;
+
+  return (
+    <>
+      <WorkRow
+        work={mainWork}
+        isSub={false}
+        expanded={expanded}
+        onToggleExpand={() => setExpanded(v => !v)}
+        hasSubs={hasSubs}
+        onDragStart={onDragStart}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+        onDragEnd={onDragEnd}
+        onNavigate={onNavigate}
+        onToggleExclude={onToggleExclude}
+        onDuplicate={onDuplicate}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onCreateSub={() => { setExpanded(true); onCreateSub(mainWork.id); }}
+      />
+
+      {/* Sub-schedule nested panel */}
+      {hasSubs && expanded && (
+        <TableRow style={{ background: 'transparent' }}>
+          <TableCell colSpan={6} style={{ padding: '0 0 0 48px', border: 'none' }}>
+            <div style={{
+              borderLeft: '2px solid var(--border)',
+              marginBottom: '4px',
+              borderRadius: '0 0 0 4px',
+            }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <tbody>
+                  {subWorks
+                    .slice()
+                    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+                    .map((subWork, i) => (
+                      <SubRow
+                        key={subWork.id}
+                        work={subWork}
+                        index={i}
+                        total={subWorks.length}
+                        onDragStart={onDragStart}
+                        onDragOver={onDragOver}
+                        onDrop={onDrop}
+                        onDragEnd={onDragEnd}
+                        onNavigate={onNavigate}
+                        onToggleExclude={onToggleExclude}
+                        onDuplicate={onDuplicate}
+                        onEdit={onEdit}
+                        onDelete={onDelete}
+                      />
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
+  );
+}
+
+function SubRow({ work, index, total, onDragStart, onDragOver, onDrop, onDragEnd, onNavigate, onToggleExclude, onDuplicate, onEdit, onDelete }) {
+  const lastDragEnd = useRef(0);
+  const isLast = index === total - 1;
+
+  return (
+    <tr
+      draggable
+      style={{
+        cursor: 'pointer',
+        transition: 'background 0.15s',
+        borderBottom: isLast ? 'none' : '1px solid var(--border)',
+      }}
+      onMouseEnter={e => e.currentTarget.style.background = 'var(--muted)'}
+      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+      onDragStart={e => {
+        e.currentTarget.style.opacity = '0.35';
+        e.dataTransfer.effectAllowed = 'move';
+        onDragStart(work.id, work.parentId);
+      }}
+      onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderTop = '2px solid var(--primary)'; onDragOver(); }}
+      onDragLeave={e => { e.currentTarget.style.borderTop = ''; }}
+      onDrop={e => { e.currentTarget.style.borderTop = ''; e.currentTarget.style.opacity = '1'; onDrop(work.id, work.parentId); }}
+      onDragEnd={e => { e.currentTarget.style.opacity = '1'; lastDragEnd.current = Date.now(); onDragEnd(); }}
+      onClick={() => { if (Date.now() - lastDragEnd.current < 300) return; onNavigate(work.id); }}
+    >
+      {/* Drag handle + indent */}
+      <td style={{ width: 48, padding: '0.6rem 0.5rem', verticalAlign: 'middle' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--muted-foreground)' }}>
+          <GripVertical size={14} style={{ cursor: 'grab', opacity: 0.5 }} />
+          <CornerDownRight size={13} />
+        </div>
+      </td>
+
+      {/* Name */}
+      <td style={{ padding: '0.6rem 0.5rem', verticalAlign: 'middle' }}>
+        <span style={{
+          fontSize: '0.875rem',
+          fontWeight: 600,
+          color: work.isExcluded ? 'var(--muted-foreground)' : 'var(--foreground)',
+          textDecoration: work.isExcluded ? 'line-through' : 'none',
+        }}>
+          {work.name}
+        </span>
+      </td>
+
+      {/* Specs */}
+      <td style={{ padding: '0.6rem 0.5rem', verticalAlign: 'middle', color: 'var(--muted-foreground)', fontSize: '0.85rem' }}>
+        {work.description || ''}
+      </td>
+
+      {/* Work code */}
+      <td style={{ width: 145, textAlign: 'center', padding: '0.6rem 0.5rem', verticalAlign: 'middle' }}>
+        <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--primary)', fontFamily: 'monospace', letterSpacing: '0.02em' }}>
+          {work.workCode || '—'}
+        </span>
+      </td>
+
+      {/* Cost */}
+      <td style={{ width: 160, textAlign: 'right', padding: '0.6rem 0.5rem', verticalAlign: 'middle', fontWeight: 700, fontSize: '0.875rem', color: work.isExcluded ? 'var(--muted-foreground)' : 'var(--foreground)' }}>
+        ₱{(work.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+      </td>
+
+      {/* Actions */}
+      <td style={{ width: 120, textAlign: 'right', padding: '0.6rem 0.5rem', verticalAlign: 'middle' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', gap: 2, justifyContent: 'flex-end', alignItems: 'center' }}>
+          <ActionBtn onClick={() => onToggleExclude(work)} title={work.isExcluded ? 'Include' : 'Exclude'}>
+            <span style={{ fontSize: 11, fontWeight: 700 }}>{work.isExcluded ? 'INC' : 'EXC'}</span>
+          </ActionBtn>
+          <ActionBtn onClick={() => onDuplicate(work)} title="Duplicate"><Copy size={13} /></ActionBtn>
+          <ActionBtn onClick={() => onEdit(work)} title="Edit"><Edit2 size={13} /></ActionBtn>
+          <ActionBtn onClick={() => onDelete(work.id)} title="Delete" destructive><Trash2 size={13} /></ActionBtn>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+function WorkRow({ work, isSub, expanded, onToggleExpand, hasSubs, onCreateSub, onDragStart, onDragOver, onDrop, onDragEnd, onNavigate, onToggleExclude, onDuplicate, onEdit, onDelete }) {
   // Track when the last drag ended so we can suppress the subsequent click
   const lastDragEnd = useRef(0);
 
@@ -168,7 +379,7 @@ function WorkRow({ work, idx, onDragStart, onDragOver, onDrop, onDragEnd, onNavi
         e.currentTarget.style.opacity = '0.35';
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', work.id);
-        onDragStart(idx, work.id);
+        onDragStart(work.id, work.parentId);
       }}
       onDragOver={e => {
         e.preventDefault();
@@ -185,7 +396,7 @@ function WorkRow({ work, idx, onDragStart, onDragOver, onDrop, onDragEnd, onNavi
         e.preventDefault();
         e.currentTarget.style.boxShadow = '';
         e.currentTarget.style.backgroundColor = '';
-        onDrop(idx);
+        onDrop(work.id, work.parentId);
       }}
       onDragEnd={e => {
         e.currentTarget.style.opacity = '1';
@@ -195,8 +406,8 @@ function WorkRow({ work, idx, onDragStart, onDragOver, onDrop, onDragEnd, onNavi
       onClick={() => { if (Date.now() - lastDragEnd.current < 300) return; onNavigate(work.id); }}
     >
       {/* ── Drag grip + exclude checkbox ── */}
-      <TableCell style={{ padding: '0.75rem 0.5rem', width: 60 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <TableCell style={{ padding: '0.75rem 0.5rem', width: 80, paddingLeft: isSub ? '2.5rem' : '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
           <span
             style={{ cursor: 'grab', color: '#a1a1aa', display: 'flex', alignItems: 'center', userSelect: 'none' }}
             title="Drag to reorder"
@@ -204,13 +415,19 @@ function WorkRow({ work, idx, onDragStart, onDragOver, onDrop, onDragEnd, onNavi
           >
             <GripVertical size={16} />
           </span>
+          {!isSub && (
+            <button onClick={e => { e.stopPropagation(); onToggleExpand(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted-foreground)', padding: 0, display: 'flex', alignItems: 'center' }}>
+              {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+            </button>
+          )}
+          {isSub && <CornerDownRight size={14} style={{ color: 'var(--muted-foreground)', marginLeft: '0.25rem' }} />}
           <input
             type="checkbox"
             checked={!!work.isExcluded}
             onChange={() => onToggleExclude(work)}
             onClick={e => e.stopPropagation()}
             title={work.isExcluded ? 'Excluded — click to include' : 'Included — click to exclude'}
-            style={{ width: 15, height: 15, cursor: 'pointer', accentColor: 'var(--primary)' }}
+            style={{ width: 15, height: 15, cursor: 'pointer', accentColor: 'var(--primary)', marginLeft: '0.25rem' }}
           />
         </div>
       </TableCell>
@@ -218,7 +435,7 @@ function WorkRow({ work, idx, onDragStart, onDragOver, onDrop, onDragEnd, onNavi
       {/* ── Work name ── */}
       <TableCell>
         <div style={{
-          fontWeight: 700,
+          fontWeight: isSub ? 600 : 700,
           fontSize: '0.95rem',
           color: work.isExcluded ? 'var(--muted-foreground)' : 'var(--primary)',
           textDecoration: work.isExcluded ? 'line-through' : 'none',
@@ -247,8 +464,9 @@ function WorkRow({ work, idx, onDragStart, onDragOver, onDrop, onDragEnd, onNavi
       </TableCell>
 
       {/* ── Action buttons (stop propagation so row-click doesn't fire) ── */}
-      <TableCell style={{ textAlign: 'right', width: 95 }} onClick={e => e.stopPropagation()}>
+      <TableCell style={{ textAlign: 'right', width: 120 }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', gap: 2, justifyContent: 'flex-end', alignItems: 'center' }}>
+          {!isSub && <ActionBtn onClick={() => onCreateSub()} title="Add Sub-Schedule"><Plus size={15} /></ActionBtn>}
           <ActionBtn onClick={() => onDuplicate(work)} title="Duplicate Work (copies summaries)"><Copy size={15} /></ActionBtn>
           <ActionBtn onClick={() => onEdit(work)} title="Edit Work"><Edit2 size={15} /></ActionBtn>
           <ActionBtn onClick={() => onDelete(work.id)} title="Delete Work" destructive><Trash2 size={15} /></ActionBtn>
@@ -297,14 +515,14 @@ export default function ProgramOfWorks() {
 
   // ── UI state ──
   const [createOpen, setCreateOpen] = useState(false);
+  const [createParentId, setCreateParentId] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
   const [editingWork, setEditingWork] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // ── Drag refs — NO React state: state updates during drag cause re-renders
-  // that reset the draggable DOM node, cancelling the native browser drag ──
+  // ── Drag refs ──
   const draggingIdx = useRef(null);
-
+  const draggingParentId = useRef(null);
 
   // ── Memoised sorted list ──
   const sortedWorks = useMemo(() => {
@@ -315,41 +533,59 @@ export default function ProgramOfWorks() {
   }, [works, searchQuery]);
 
   const runningTotal = useMemo(
-    // Running total reflects only non-excluded works (excluded ones removed from project total too)
-    () => sortedWorks.filter(w => !w.isExcluded).reduce((s, w) => s + (w.totalCost || 0), 0),
+    // Running total reflects only non-excluded MAIN works (sub-schedules are rolled up into main works)
+    () => sortedWorks.filter(w => !w.isExcluded && !w.parentId).reduce((s, w) => s + (w.totalCost || 0), 0),
     [sortedWorks],
   );
 
   // Ref keeps handleDrop's closure fresh without sortedWorks as a useCallback dep.
-  // Declared after useMemo so [sortedWorks] dep array doesn't hit the dead zone.
   const sortedWorksRef = useRef([]);
   React.useEffect(() => { sortedWorksRef.current = sortedWorks; }, [sortedWorks]);
 
-  // Same ref pattern for projectCode — needed inside handleDrop to regenerate work codes
+  // Tracks the FULL unfiltered works array — used by computeWorkCodeUpdates
+  // so search-filtered views don’t exclude items from reindex operations.
+  const worksRef = useRef([]);
+  React.useEffect(() => { worksRef.current = works; }, [works]);
+
+  // Same ref pattern for projectCode
   const projectCodeRef = useRef('');
   React.useEffect(() => { projectCodeRef.current = project?.projectCode ?? ''; }, [project]);
 
   // ─── Handlers ─────────────────────────────────────────────────────────────
 
   const handleCreate = useCallback(async ({ name, description }) => {
-    // Read project INSIDE the callback to always get the latest value
-    const currentProject = projects.find(p => p.id === projectId);
-    const allWorks = works.filter(w => w.projectId === projectId);
-    const workCode = nextWorkCode(currentProject?.projectCode ?? '', allWorks);
-    const maxOrder = allWorks.reduce((m, w) => Math.max(m, w.order ?? 0), -1);
+    const newId = crypto.randomUUID();
+    const pCode = projectCodeRef.current;
+
+    // Compute a temporary order so the new item lands at the bottom of its group
+    const siblings = worksRef.current.filter(
+      w => (w.parentId || null) === (createParentId || null)
+    );
+    const tempOrder = siblings.reduce((m, w) => Math.max(m, w.order ?? 0), -1) + 1;
 
     await createItem({
-      id: crypto.randomUUID(),
+      id: newId,
       projectId,
+      parentId: createParentId || null,
       name,
       description,
-      workCode,
+      workCode: '', // will be corrected by full reindex below
       totalCost: 0,
       isExcluded: false,
-      order: maxOrder + 1,
+      order: tempOrder,
     });
+
+    // Full reindex: include the new item in the snapshot
+    const allAfter = [...worksRef.current, {
+      id: newId, projectId, parentId: createParentId || null,
+      order: tempOrder, workCode: '',
+    }];
+    const codeUpdates = computeWorkCodeUpdates(allAfter, pCode);
+    if (codeUpdates.length) await Promise.all(codeUpdates.map(u => updateItem(u)));
+
     setCreateOpen(false);
-  }, [projects, works, projectId, createItem]);
+    setCreateParentId(null);
+  }, [projectId, createItem, createParentId, updateItem]);
 
   const handleEdit = useCallback(async ({ name, description }) => {
     if (!editingWork) return;
@@ -360,24 +596,46 @@ export default function ProgramOfWorks() {
 
   const handleDelete = useCallback(async (id) => {
     if (!confirm('Delete this work? All cost entries will be permanently removed.')) return;
+
+    // Collect the full subtree IDs so we exclude them from the reindex snapshot
+    const allCurrent = worksRef.current;
+    const subtreeIds = new Set([id]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      allCurrent.forEach(w => {
+        if (w.parentId && subtreeIds.has(w.parentId) && !subtreeIds.has(w.id)) {
+          subtreeIds.add(w.id); changed = true;
+        }
+      });
+    }
+
     await cascadeDelete('schedule', id);
+
+    // Full reindex on the remaining items (subtree already removed from IDB)
+    const allAfter = allCurrent.filter(w => !subtreeIds.has(w.id));
+    const codeUpdates = computeWorkCodeUpdates(allAfter, projectCodeRef.current);
+    if (codeUpdates.length) await Promise.all(codeUpdates.map(u => updateItem(u)));
+
     refresh();
-  }, [refresh]);
+  }, [refresh, updateItem]);
 
   const handleToggleExclude = useCallback(async (work) => {
     const isNowExcluded = !work.isExcluded;
     // Persist the exclusion flag — this is awaited so IDB has the updated
     // isExcluded value before the recompute reads from it
     await updateItem({ ...work, isExcluded: isNowExcluded });
-    // Recompute project / facility / campus from ground truth (not delta)
-    await recomputeProjectCost(work.projectId);
+    
+    // Recompute schedule from ground truth (which cascades to project/facility/campus)
+    await recomputeScheduleCost(work.id);
   }, [updateItem]);
 
   const handleDuplicate = useCallback(async (work) => {
     const currentProject = projects.find(p => p.id === work.projectId);
-    const allWorks = works.filter(w => w.projectId === work.projectId);
-    const workCode = nextWorkCode(currentProject?.projectCode ?? '', allWorks);
-    const maxOrder = allWorks.reduce((m, w) => Math.max(m, w.order ?? 0), -1);
+    const siblings = works.filter(w => w.projectId === work.projectId && (w.parentId || null) === (work.parentId || null));
+    const parent = works.find(w => w.id === work.parentId);
+    const workCode = generateWorkCode(currentProject?.projectCode, parent?.workCode, siblings);
+    const maxOrder = siblings.reduce((m, w) => Math.max(m, w.order ?? 0), -1);
 
     await cascadeDuplicateSchedule({
       sourceScheduleId: work.id,
@@ -406,46 +664,53 @@ export default function ProgramOfWorks() {
 
   // ─── Drag & drop ──────────────────────────────────────────────────────────
 
-  const handleDragStart = useCallback((idx, id) => {
-    draggingIdx.current = idx;
-    // No state update — visual feedback handled in WorkRow via e.currentTarget.style
+  const handleDragStart = useCallback((id, parentId) => {
+    draggingIdx.current = id;
+    draggingParentId.current = parentId || null;
   }, []);
 
   const handleDragOver = useCallback(() => {
     // No state update — visual feedback handled in WorkRow via e.currentTarget.style
   }, []);
 
-  const handleDrop = useCallback(async (dropIdx) => {
-    const fromIdx = draggingIdx.current;
+  const handleDrop = useCallback(async (targetId, targetParentId) => {
+    const fromId = draggingIdx.current;
+    const fromParentId = draggingParentId.current;
     draggingIdx.current = null;
-    if (fromIdx === null || fromIdx === dropIdx) return;
+    draggingParentId.current = null;
 
-    const list = sortedWorksRef.current; // ref — never stale
-    const reordered = [...list];
-    const [moved] = reordered.splice(fromIdx, 1);
-    reordered.splice(dropIdx, 0, moved);
+    if (!fromId || fromId === targetId) return;
+    if (fromParentId !== (targetParentId || null)) return;
 
-    // Build a map of original orders for O(1) lookup
-    const originalOrder = Object.fromEntries(list.map(w => [w.id, w.order ?? 0]));
-    const pCode = projectCodeRef.current;
+    // Build the current sibling list sorted by their saved order
+    const siblings = worksRef.current
+      .filter(w => (w.parentId || null) === fromParentId)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
-    // Reindex positions AND regenerate work codes to match new positions
-    const reindexed = reindex(reordered).map(item => ({
-      ...item,
-      // Letter suffix always reflects the item's new position: A=0, B=1, C=2…
-      workCode: pCode ? `${pCode}.${indexToLetter(item.order)}` : item.workCode,
-    }));
+    const fromIndex = siblings.findIndex(w => w.id === fromId);
+    const targetIndex = siblings.findIndex(w => w.id === targetId);
+    if (fromIndex === -1 || targetIndex === -1) return;
+    if (fromIndex === targetIndex) return; // no-op
 
-    // Only persist items whose order (and thus work code) actually changed
-    await Promise.all(
-      reindexed
-        .filter(item => item.order !== originalOrder[item.id])
-        .map(item => updateItem(item)),
-    );
+    // Splice to get new visual order, then immediately assign contiguous 0-based orders
+    // so computeWorkCodeUpdates sees the intended order, not the old saved values.
+    const spliced = [...siblings];
+    const [moved] = spliced.splice(fromIndex, 1);
+    spliced.splice(targetIndex, 0, moved);
+    const reordered = spliced.map((item, idx) => ({ ...item, order: idx }));
+
+    // Merge reordered siblings back with the rest to build the full project snapshot
+    const nonSiblings = worksRef.current.filter(w => (w.parentId || null) !== fromParentId);
+    const fullSnapshot = [...nonSiblings, ...reordered];
+
+    // Full reindex from snapshot — corrects root AND sub work codes in one pass
+    const codeUpdates = computeWorkCodeUpdates(fullSnapshot, projectCodeRef.current);
+    if (codeUpdates.length) await Promise.all(codeUpdates.map(u => updateItem(u)));
   }, [updateItem]);
 
   const handleDragEnd = useCallback(() => {
     draggingIdx.current = null;
+    draggingParentId.current = null;
     // DOM style reset is done inside WorkRow's onDragEnd handler
   }, []);
 
@@ -592,7 +857,7 @@ export default function ProgramOfWorks() {
             </Button>
           </div>
 
-          <Button onClick={() => setCreateOpen(true)}>
+          <Button onClick={() => { setCreateParentId(null); setCreateOpen(true); }}>
             <Plus size={18} /> New Work
           </Button>
         </div>
@@ -621,11 +886,11 @@ export default function ProgramOfWorks() {
               </TableRow>
             )}
 
-            {sortedWorks.map((work, idx) => (
-              <WorkRow
-                key={work.id}
-                work={work}
-                idx={idx}
+            {sortedWorks.filter(w => !w.parentId).map((mainWork) => (
+              <WorkGroup
+                key={mainWork.id}
+                mainWork={mainWork}
+                subWorks={sortedWorks.filter(w => w.parentId === mainWork.id)}
                 onDragStart={handleDragStart}
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
@@ -635,6 +900,10 @@ export default function ProgramOfWorks() {
                 onDuplicate={handleDuplicate}
                 onEdit={openEdit}
                 onDelete={handleDelete}
+                onCreateSub={(parentId) => {
+                  setCreateParentId(parentId);
+                  setCreateOpen(true);
+                }}
               />
             ))}
           </TableBody>

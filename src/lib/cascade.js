@@ -11,7 +11,9 @@ const executeDelete = async (collection, id) => {
     await addToSyncQueue({ type: 'delete', collection, payload: item });
     notifyUpdate(collection);
     window.dispatchEvent(new Event('triggerSync'));
+    return item;
   }
+  return null;
 };
 
 const executeCreate = async (collection, payload) => {
@@ -32,39 +34,55 @@ export const cascadeDelete = async (type, id) => {
     }
   } 
   else if (type === 'facility') {
-    await executeDelete('facilities', id);
+    const deletedFacility = await executeDelete('facilities', id);
     let projects = [];
     try { projects = await getAllFromIndexDB('projects', 'facilityId', id); } 
     catch { projects = (await getAllFromDB('projects')).filter(p => p.facilityId === id); }
     for (const p of projects) {
       await cascadeDelete('project', p.id);
     }
+    if (deletedFacility && deletedFacility.campusId) {
+      const { recomputeCampusCost } = await import('./billing');
+      await recomputeCampusCost(deletedFacility.campusId);
+    }
   }
   else if (type === 'project') {
-    await executeDelete('projects', id);
+    const deletedProject = await executeDelete('projects', id);
     let schedules = [];
     try { schedules = await getAllFromIndexDB('schedulesOfWork', 'projectId', id); } 
     catch { schedules = (await getAllFromDB('schedulesOfWork')).filter(s => s.projectId === id); }
     for (const s of schedules) {
       await cascadeDelete('schedule', s.id);
     }
+    if (deletedProject && deletedProject.facilityId) {
+      const { recomputeFacilityCost } = await import('./billing');
+      await recomputeFacilityCost(deletedProject.facilityId);
+    }
   }
   else if (type === 'schedule') {
-    await executeDelete('schedulesOfWork', id);
+    const deletedSchedule = await executeDelete('schedulesOfWork', id);
     let summaries = [];
     try { summaries = await getAllFromIndexDB('scheduleSummaries', 'scheduleOfWorkId', id); } 
     catch { summaries = (await getAllFromDB('scheduleSummaries')).filter(s => s.scheduleOfWorkId === id); }
     for (const sum of summaries) {
       await cascadeDelete('summary', sum.id);
     }
+    if (deletedSchedule && deletedSchedule.projectId) {
+      const { recomputeProjectCost } = await import('./billing');
+      await recomputeProjectCost(deletedSchedule.projectId);
+    }
   }
   else if (type === 'summary') {
-    await executeDelete('scheduleSummaries', id);
+    const deletedSummary = await executeDelete('scheduleSummaries', id);
     let items = [];
     try { items = await getAllFromIndexDB('summaryItems', 'summaryId', id); } 
     catch { items = (await getAllFromDB('summaryItems')).filter(i => i.summaryId === id); }
     for (const item of items) {
       await executeDelete('summaryItems', item.id);
+    }
+    if (deletedSummary && deletedSummary.scheduleOfWorkId) {
+      const { recomputeScheduleCost } = await import('./billing');
+      await recomputeScheduleCost(deletedSummary.scheduleOfWorkId);
     }
   }
 };

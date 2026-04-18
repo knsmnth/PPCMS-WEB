@@ -37,6 +37,10 @@ export default function SummaryWorkspace() {
   
   const { data: allSchedules } = useCollection('schedulesOfWork');
   const scheduleContext = allSchedules.find(s => s.id === scheduleId);
+  const { data: projects } = useCollection('projects');
+  const projectContext = scheduleContext ? projects.find(p => p.id === scheduleContext.projectId) : null;
+  const { data: facilities } = useCollection('facilities');
+  const facilityContext = projectContext ? facilities.find(f => f.id === projectContext.facilityId) : null;
   
   const navigate = useNavigate();
   const [summaryName, setSummaryName] = useState('');
@@ -130,8 +134,29 @@ export default function SummaryWorkspace() {
           >
             <ArrowLeft size={14} /> Back to Program of Works
           </button>
-          <h1 style={{ fontSize: '1.875rem', fontWeight: 800, color: 'var(--primary)', letterSpacing: '-0.03em' }}>Schedule of Works</h1>
-          <p style={{ color: 'var(--muted-foreground)', fontSize: '0.925rem', marginTop: '0.25rem' }}>Management of individual cost items and material acquisitions.</p>
+          <h1 style={{ fontSize: '1.875rem', fontWeight: 800, color: 'var(--primary)', letterSpacing: '-0.03em' }}>
+            Schedule of Works
+          </h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.4rem', flexWrap: 'wrap' }}>
+            {facilityContext && (
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.2rem 0.6rem', backgroundColor: 'var(--secondary)', color: 'var(--primary)', borderRadius: '1rem', textTransform: 'uppercase' }}>
+                {facilityContext.name}
+              </span>
+            )}
+            {projectContext && (
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#3f3f46' }}>
+                {projectContext.name}
+              </span>
+            )}
+            {scheduleContext && (
+              <>
+                <span style={{ color: 'var(--muted-foreground)' }}>•</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--muted-foreground)' }}>
+                  {scheduleContext.name}
+                </span>
+              </>
+            )}
+          </div>
         </div>
         
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

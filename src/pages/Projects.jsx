@@ -547,12 +547,12 @@ export default function Projects() {
                   {p.projectCode || '---'}
                 </TableCell>
                 <TableCell style={{ textDecoration: p.isExcluded ? 'line-through' : 'none' }}>
-                  <div style={{ fontWeight: 800, fontSize: '1.15rem', color: p.isExcluded ? 'var(--muted-foreground)' : '#092e20', marginBottom: '0.15rem' }}>{p.name}</div>
-                  <div style={{ fontSize: '0.8rem', color: '#52525b', fontWeight: 500 }}>
-                    {pFacility ? `${pFacility.name} (${pFacility.id?.substring(0,6).toUpperCase()})` : 'Unknown Facility'}
+                  <div style={{ fontWeight: 800, fontSize: '1.35rem', color: p.isExcluded ? 'var(--muted-foreground)' : '#092e20', marginBottom: '0.1rem', letterSpacing: '-0.02em', lineHeight: '1.2' }}>{p.name}</div>
+                  <div style={{ fontSize: '0.9rem', color: p.isExcluded ? 'var(--muted-foreground)' : '#26513A', fontWeight: 500, marginBottom: '0.15rem' }}>
+                    {pFacility ? `${pFacility.name} (${pFacility.id?.substring(0,8).toUpperCase()})` : 'Unknown Facility'}
                   </div>
                   {p.description && (
-                    <div style={{ fontSize: '0.75rem', color: '#a1a1aa', marginTop: '0.2rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    <div style={{ fontSize: '0.85rem', color: p.isExcluded ? 'var(--muted-foreground)' : '#a1a1aa', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.4' }}>
                       {p.description}
                     </div>
                   )}

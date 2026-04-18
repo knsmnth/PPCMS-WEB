@@ -20,7 +20,11 @@ export default function Dashboard() {
   const { data: schedules } = useCollection('schedulesOfWork');
   const navigate = useNavigate();
 
-  const totalCost = campuses.reduce((sum, c) => sum + (c.totalCost || 0), 0);
+  const activeCampuses = campuses.filter(c => !c.isExcluded);
+  const activeProjects = projects.filter(p => !p.isExcluded);
+  const activeFacilities = facilities.filter(f => !f.isExcluded);
+
+  const totalCost = activeCampuses.reduce((sum, c) => sum + (c.totalCost || 0), 0);
 
   const StatCard = ({ title, value, icon: Icon, color }) => (
     <div style={{ backgroundColor: 'var(--background)', padding: '1.5rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -46,9 +50,9 @@ export default function Dashboard() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
         <StatCard title="Total Asset Valuation" value={`₱${totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={TrendingUp} color="#10b981" />
-        <StatCard title="Active Campuses" value={campuses.length} icon={Building2} color="#6366f1" />
-        <StatCard title="Total Facilities" value={facilities.length} icon={Layers} color="#f59e0b" />
-        <StatCard title="Projected Operations" value={projects.length} icon={Folder} color="#ef4444" />
+        <StatCard title="Active Campuses" value={activeCampuses.length} icon={Building2} color="#6366f1" />
+        <StatCard title="Total Facilities" value={activeFacilities.length} icon={Layers} color="#f59e0b" />
+        <StatCard title="Projected Operations" value={activeProjects.length} icon={Folder} color="#ef4444" />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem' }}>

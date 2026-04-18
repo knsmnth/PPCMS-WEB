@@ -87,30 +87,52 @@ export async function recomputeProjectCost(projectId) {
     const updatedProj = await saveAndNotify('projects', { ...proj, totalCost: projectTotal });
 
     // 2. Compute facility total from all its projects (fresh from IDB after project update)
-    if (!updatedProj.facilityId) return;
+    if (updatedProj.facilityId) {
+      await recomputeFacilityCost(updatedProj.facilityId);
+    } else {
+      triggerSync();
+    }
+  } catch (err) {
+    console.error('[Billing] recomputeProjectCost failed:', err);
+  }
+}
+
+export async function recomputeFacilityCost(facilityId) {
+  if (!facilityId) return;
+  try {
     const allProjects = await getAllFromDB('projects');
     const facilityTotal = allProjects
-      .filter(p => p.facilityId === updatedProj.facilityId)
+      .filter(p => p.facilityId === facilityId && !p.isExcluded)
       .reduce((sum, p) => sum + (p.totalCost || 0), 0);
 
-    const fac = await getFromDB('facilities', updatedProj.facilityId);
+    const fac = await getFromDB('facilities', facilityId);
     if (!fac) return;
     const updatedFac = await saveAndNotify('facilities', { ...fac, totalCost: facilityTotal });
 
-    // 3. Compute campus total from all its facilities (fresh from IDB after facility update)
-    if (!updatedFac.campusId) return;
+    if (updatedFac.campusId) {
+      await recomputeCampusCost(updatedFac.campusId);
+    } else {
+      triggerSync();
+    }
+  } catch (err) {
+    console.error('[Billing] recomputeFacilityCost failed:', err);
+  }
+}
+
+export async function recomputeCampusCost(campusId) {
+  if (!campusId) return;
+  try {
     const allFacilities = await getAllFromDB('facilities');
     const campusTotal = allFacilities
-      .filter(f => f.campusId === updatedFac.campusId)
+      .filter(f => f.campusId === campusId && !f.isExcluded)
       .reduce((sum, f) => sum + (f.totalCost || 0), 0);
 
-    const camp = await getFromDB('campuses', updatedFac.campusId);
+    const camp = await getFromDB('campuses', campusId);
     if (!camp) return;
     await saveAndNotify('campuses', { ...camp, totalCost: campusTotal });
 
-    console.log('[Billing] Project cost recomputed:', projectId, '→', projectTotal);
     triggerSync();
   } catch (err) {
-    console.error('[Billing] recomputeProjectCost failed:', err);
+    console.error('[Billing] recomputeCampusCost failed:', err);
   }
 }

@@ -11,6 +11,7 @@ import { exportProjectsTemplate, parseProjectsExcel } from '../lib/excel';
 import { SelectCombo } from '../components/ui/select-combo';
 import { Select } from '../components/ui/select';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { recomputeFacilityCost } from '../lib/billing';
 
 export default function Projects() {
   const [searchParams] = useSearchParams();
@@ -230,6 +231,16 @@ export default function Projects() {
       await cascadeDelete('project', id);
       refresh();
     }
+  };
+
+  const handleToggleExclude = async (e, project) => {
+    e.stopPropagation();
+    const isNowExcluded = !project.isExcluded;
+    await updateItem({ ...project, isExcluded: isNowExcluded });
+    if (project.facilityId) {
+      await recomputeFacilityCost(project.facilityId);
+    }
+    refresh();
   };
 
   const handleDuplicate = async (e, project) => {
@@ -474,6 +485,7 @@ export default function Projects() {
         <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
           <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'var(--background)', borderBottom: '1px solid var(--border)' }}>
             <TableRow>
+              <TableHead style={{ width: 40 }} />
               <TableHead onClick={() => handleSort('projectCode')} style={{ cursor: 'pointer', textAlign: 'center', width: '120px', fontWeight: 700, fontSize: '0.75rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
                   PROJECT CODE <ChevronDown size={14} style={{ opacity: 0.5, transition: 'transform 0.2s', transform: sortConfig.key === 'projectCode' && sortConfig.direction === 'asc' ? 'rotate(180deg)' : 'rotate(0deg)' }} />
@@ -517,15 +529,25 @@ export default function Projects() {
                 key={p.id} 
                 ref={rowVirtualizer.measureElement} 
                 data-index={virtualRow.index} 
-                style={{ cursor: 'pointer' }}
+                style={{ cursor: 'pointer', opacity: p.isExcluded ? 0.6 : 1 }}
                 onClick={() => navigate(`/schedules?projectId=${p.id}`)}
                 className="hover:bg-muted/50"
               >
-                <TableCell style={{ textAlign: 'center', fontWeight: 800, fontSize: '1.1rem', color: '#092e20' }}>
+                <TableCell style={{ padding: '0.75rem 0.5rem', width: 40, textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!p.isExcluded}
+                    onChange={(e) => handleToggleExclude(e, p)}
+                    onClick={e => e.stopPropagation()}
+                    title={p.isExcluded ? 'Excluded — click to include' : 'Included — click to exclude'}
+                    style={{ width: 15, height: 15, cursor: 'pointer', accentColor: 'var(--primary)' }}
+                  />
+                </TableCell>
+                <TableCell style={{ textAlign: 'center', fontWeight: 800, fontSize: '1.1rem', color: p.isExcluded ? 'var(--muted-foreground)' : '#092e20', textDecoration: p.isExcluded ? 'line-through' : 'none' }}>
                   {p.projectCode || '---'}
                 </TableCell>
-                <TableCell>
-                  <div style={{ fontWeight: 800, fontSize: '1.15rem', color: '#092e20', marginBottom: '0.15rem' }}>{p.name}</div>
+                <TableCell style={{ textDecoration: p.isExcluded ? 'line-through' : 'none' }}>
+                  <div style={{ fontWeight: 800, fontSize: '1.15rem', color: p.isExcluded ? 'var(--muted-foreground)' : '#092e20', marginBottom: '0.15rem' }}>{p.name}</div>
                   <div style={{ fontSize: '0.8rem', color: '#52525b', fontWeight: 500 }}>
                     {pFacility ? `${pFacility.name} (${pFacility.id?.substring(0,6).toUpperCase()})` : 'Unknown Facility'}
                   </div>
@@ -591,8 +613,8 @@ export default function Projects() {
                     <ChevronDown size={14} style={{ position: 'absolute', right: '0.4rem', pointerEvents: 'none', color: sColor.text, opacity: 0.8 }} />
                   </div>
                 </TableCell>
-                <TableCell style={{ textAlign: 'center', padding: '0.5rem' }}>
-                    <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--primary)' }}>
+                <TableCell style={{ textAlign: 'center', padding: '0.5rem', textDecoration: p.isExcluded ? 'line-through' : 'none' }}>
+                    <div style={{ fontWeight: 800, fontSize: '1.05rem', color: p.isExcluded ? 'var(--muted-foreground)' : 'var(--primary)' }}>
                      ₱{(p.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', fontWeight: 500, marginTop: '0.1rem' }}>

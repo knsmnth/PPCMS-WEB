@@ -68,6 +68,13 @@ export default function Campuses() {
     }
   };
 
+  const handleToggleExclude = async (e, campus) => {
+    e.stopPropagation();
+    const isNowExcluded = !campus.isExcluded;
+    await updateItem({ ...campus, isExcluded: isNowExcluded });
+    refresh();
+  };
+
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
@@ -128,6 +135,7 @@ export default function Campuses() {
         <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
           <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'var(--background)' }}>
             <TableRow>
+              <TableHead style={{ width: 40 }} />
               <TableHead>Campus Information</TableHead>
               <TableHead>Location</TableHead>
               <TableHead style={{ textAlign: 'right' }}>Total Cost Baseline</TableHead>
@@ -155,18 +163,28 @@ export default function Campuses() {
             {virtualRows.map((virtualRow) => {
               const c = filteredData[virtualRow.index];
               return (
-              <TableRow key={c.id} ref={rowVirtualizer.measureElement} data-index={virtualRow.index}>
-                <TableCell>
-                  <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--primary)' }}>{c.name}</div>
+              <TableRow key={c.id} ref={rowVirtualizer.measureElement} data-index={virtualRow.index} style={{ opacity: c.isExcluded ? 0.6 : 1 }}>
+                <TableCell style={{ padding: '0.75rem 0.5rem', width: 40, textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!c.isExcluded}
+                    onChange={(e) => handleToggleExclude(e, c)}
+                    onClick={e => e.stopPropagation()}
+                    title={c.isExcluded ? 'Excluded — click to include' : 'Included — click to exclude'}
+                    style={{ width: 15, height: 15, cursor: 'pointer', accentColor: 'var(--primary)' }}
+                  />
+                </TableCell>
+                <TableCell style={{ textDecoration: c.isExcluded ? 'line-through' : 'none' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.95rem', color: c.isExcluded ? 'var(--muted-foreground)' : 'var(--primary)' }}>{c.name}</div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>ID: {c.id.substring(0, 8)}...</div>
                 </TableCell>
-                <TableCell>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
+                <TableCell style={{ textDecoration: c.isExcluded ? 'line-through' : 'none' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: c.isExcluded ? 'var(--muted-foreground)' : 'inherit' }}>
                     <MapPin size={14} color="var(--muted-foreground)" />
                     {c.location || 'N/A'}
                   </div>
                 </TableCell>
-                <TableCell style={{ textAlign: 'right', fontWeight: 700, color: 'var(--foreground)', fontVariantNumeric: 'tabular-nums' }}>
+                <TableCell style={{ textAlign: 'right', fontWeight: 700, color: c.isExcluded ? 'var(--muted-foreground)' : 'var(--foreground)', fontVariantNumeric: 'tabular-nums', textDecoration: c.isExcluded ? 'line-through' : 'none' }}>
                   ₱{(c.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </TableCell>
                 <TableCell style={{ textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center' }}>

@@ -9,6 +9,7 @@ import { Building, Plus, ArrowRight, ArrowLeft, Edit2, Trash2, Search } from 'lu
 import { cascadeDelete } from '../lib/cascade';
 import { SelectCombo } from '../components/ui/select-combo';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { recomputeCampusCost } from '../lib/billing';
 
 export default function Facilities() {
   const [searchParams] = useSearchParams();
@@ -75,6 +76,16 @@ export default function Facilities() {
       await cascadeDelete('facility', id);
       refresh();
     }
+  };
+
+  const handleToggleExclude = async (e, facility) => {
+    e.stopPropagation();
+    const isNowExcluded = !facility.isExcluded;
+    await updateItem({ ...facility, isExcluded: isNowExcluded });
+    if (facility.campusId) {
+      await recomputeCampusCost(facility.campusId);
+    }
+    refresh();
   };
 
   if (!campusId) {
@@ -160,6 +171,7 @@ export default function Facilities() {
         <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
           <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'var(--background)' }}>
             <TableRow>
+              <TableHead style={{ width: 40 }} />
               <TableHead>Facility Identity</TableHead>
               <TableHead>Classification</TableHead>
               <TableHead style={{ textAlign: 'right' }}>Cumulative Valuation</TableHead>
@@ -187,17 +199,27 @@ export default function Facilities() {
             {virtualRows.map((virtualRow) => {
               const f = filteredData[virtualRow.index];
               return (
-              <TableRow key={f.id} ref={rowVirtualizer.measureElement} data-index={virtualRow.index}>
-                <TableCell>
-                  <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--primary)' }}>{f.name}</div>
+              <TableRow key={f.id} ref={rowVirtualizer.measureElement} data-index={virtualRow.index} style={{ opacity: f.isExcluded ? 0.6 : 1 }}>
+                <TableCell style={{ padding: '0.75rem 0.5rem', width: 40, textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!f.isExcluded}
+                    onChange={(e) => handleToggleExclude(e, f)}
+                    onClick={e => e.stopPropagation()}
+                    title={f.isExcluded ? 'Excluded — click to include' : 'Included — click to exclude'}
+                    style={{ width: 15, height: 15, cursor: 'pointer', accentColor: 'var(--primary)' }}
+                  />
+                </TableCell>
+                <TableCell style={{ textDecoration: f.isExcluded ? 'line-through' : 'none' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.95rem', color: f.isExcluded ? 'var(--muted-foreground)' : 'var(--primary)' }}>{f.name}</div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>UID: {f.id.substring(0, 8)}...</div>
                 </TableCell>
-                <TableCell>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '0.25rem 0.6rem', borderRadius: '1rem', backgroundColor: 'var(--secondary)', color: 'var(--primary)', textTransform: 'uppercase' }}>
+                <TableCell style={{ textDecoration: f.isExcluded ? 'line-through' : 'none' }}>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '0.25rem 0.6rem', borderRadius: '1rem', backgroundColor: 'var(--secondary)', color: f.isExcluded ? 'var(--muted-foreground)' : 'var(--primary)', textTransform: 'uppercase' }}>
                     {f.type || 'Standard'}
                   </span>
                 </TableCell>
-                <TableCell style={{ textAlign: 'right', fontWeight: 700, color: 'var(--foreground)' }}>
+                <TableCell style={{ textAlign: 'right', fontWeight: 700, color: f.isExcluded ? 'var(--muted-foreground)' : 'var(--foreground)', textDecoration: f.isExcluded ? 'line-through' : 'none' }}>
                   ₱{(f.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </TableCell>
                 <TableCell style={{ textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center' }}>

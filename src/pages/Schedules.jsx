@@ -627,11 +627,14 @@ export default function ProgramOfWorks() {
 
   const handleToggleExclude = useCallback(async (work) => {
     const isNowExcluded = !work.isExcluded;
-    // Persist the exclusion flag — this is awaited so IDB has the updated
-    // isExcluded value before the recompute reads from it
-    await updateItem({ ...work, isExcluded: isNowExcluded });
-    
-    // Recompute schedule from ground truth (which cascades to project/facility/campus)
+
+    // Collect the work itself + any direct children (sub-schedules)
+    const toUpdate = [work, ...worksRef.current.filter(w => w.parentId === work.id)];
+
+    // Persist all exclusion flags atomically — awaited so IDB is settled before recompute
+    await Promise.all(toUpdate.map(w => updateItem({ ...w, isExcluded: isNowExcluded })));
+
+    // Recompute costs from ground truth — cascades to project / facility / campus
     await recomputeScheduleCost(work.id);
   }, [updateItem]);
 

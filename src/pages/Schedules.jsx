@@ -314,11 +314,19 @@ function SubRow({ work, index, total, onDragStart, onDragOver, onDrop, onDragEnd
       onDragEnd={e => { e.currentTarget.style.opacity = '1'; lastDragEnd.current = Date.now(); onDragEnd(); }}
       onClick={() => { if (Date.now() - lastDragEnd.current < 300) return; onNavigate(work.id); }}
     >
-      {/* Drag handle + indent */}
+      {/* Drag handle + exclude checkbox — matches parent WorkRow layout */}
       <td style={{ width: 48, padding: '0.6rem 0.5rem', verticalAlign: 'middle' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--muted-foreground)' }}>
           <GripVertical size={14} style={{ cursor: 'grab', opacity: 0.5 }} />
           <CornerDownRight size={13} />
+          <input
+            type="checkbox"
+            checked={!!work.isExcluded}
+            onChange={() => onToggleExclude(work)}
+            onClick={e => e.stopPropagation()}
+            title={work.isExcluded ? 'Excluded — click to include' : 'Included — click to exclude'}
+            style={{ width: 14, height: 14, cursor: 'pointer', accentColor: 'var(--primary)', marginLeft: 2 }}
+          />
         </div>
       </td>
 
@@ -354,9 +362,6 @@ function SubRow({ work, index, total, onDragStart, onDragOver, onDrop, onDragEnd
       {/* Actions */}
       <td style={{ width: 120, textAlign: 'right', padding: '0.6rem 0.5rem', verticalAlign: 'middle' }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', gap: 2, justifyContent: 'flex-end', alignItems: 'center' }}>
-          <ActionBtn onClick={() => onToggleExclude(work)} title={work.isExcluded ? 'Include' : 'Exclude'}>
-            <span style={{ fontSize: 11, fontWeight: 700 }}>{work.isExcluded ? 'INC' : 'EXC'}</span>
-          </ActionBtn>
           <ActionBtn onClick={() => onDuplicate(work)} title="Duplicate"><Copy size={13} /></ActionBtn>
           <ActionBtn onClick={() => onEdit(work)} title="Edit"><Edit2 size={13} /></ActionBtn>
           <ActionBtn onClick={() => onDelete(work.id)} title="Delete" destructive><Trash2 size={13} /></ActionBtn>

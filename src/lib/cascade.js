@@ -77,12 +77,8 @@ export const cascadeDuplicateProject = async ({ sourceProjectId, newProjectPaylo
 
   await executeCreate('projects', newProjectPayload);
 
-  let schedules = [];
-  try {
-    schedules = await getAllFromIndexDB('schedulesOfWork', 'projectId', sourceProjectId);
-  } catch {
-    schedules = (await getAllFromDB('schedulesOfWork')).filter(s => s.projectId === sourceProjectId);
-  }
+  const allSchedules = await getAllFromDB('schedulesOfWork');
+  const schedules = allSchedules.filter(s => s.projectId === sourceProjectId);
 
   for (const schedule of schedules) {
     const newScheduleId = crypto.randomUUID();
@@ -94,12 +90,8 @@ export const cascadeDuplicateProject = async ({ sourceProjectId, newProjectPaylo
     };
     await executeCreate('schedulesOfWork', newSchedule);
 
-    let summaries = [];
-    try {
-      summaries = await getAllFromIndexDB('scheduleSummaries', 'scheduleOfWorkId', schedule.id);
-    } catch {
-      summaries = (await getAllFromDB('scheduleSummaries')).filter(sum => sum.scheduleOfWorkId === schedule.id);
-    }
+    const allSummaries = await getAllFromDB('scheduleSummaries');
+    const summaries = allSummaries.filter(sum => sum.scheduleOfWorkId === schedule.id);
 
     for (const summary of summaries) {
       const newSummaryId = crypto.randomUUID();
@@ -111,12 +103,8 @@ export const cascadeDuplicateProject = async ({ sourceProjectId, newProjectPaylo
       };
       await executeCreate('scheduleSummaries', newSummary);
 
-      let items = [];
-      try {
-        items = await getAllFromIndexDB('summaryItems', 'summaryId', summary.id);
-      } catch {
-        items = (await getAllFromDB('summaryItems')).filter(item => item.summaryId === summary.id);
-      }
+      const allItems = await getAllFromDB('summaryItems');
+      const items = allItems.filter(item => item.summaryId === summary.id);
 
       for (const item of items) {
         const newItem = {
@@ -129,6 +117,10 @@ export const cascadeDuplicateProject = async ({ sourceProjectId, newProjectPaylo
       }
     }
   }
+
+  // Ensure full project cost rollup runs after copying all entities
+  const { recomputeProjectCost } = await import('./billing');
+  await recomputeProjectCost(newProjectPayload.id);
 };
 
 export const cascadeDuplicateSchedule = async ({ sourceScheduleId, newSchedulePayload }) => {
@@ -167,15 +159,12 @@ export const cascadeDuplicateSchedule = async ({ sourceScheduleId, newSchedulePa
       totalCost: summaryTotal,
       createdAt: new Date().toISOString(),
     });
-
-    newScheduleTotalCost += summaryTotal;
   }
 
-  // Patch the new schedule's totalCost to reflect copied summaries and notify UI
-  if (newScheduleTotalCost > 0) {
-    const updatedSchedule = { ...newSchedulePayload, totalCost: newScheduleTotalCost };
-    await putToDB('schedulesOfWork', updatedSchedule);
-    await addToSyncQueue({ type: 'update', collection: 'schedulesOfWork', payload: updatedSchedule });
-    notifyUpdate('schedulesOfWork'); // ← critical: triggers UI re-read immediately
-  }
+  // Use the canonical recompute to ensure all parents (project, facility, etc.) 
+  // also get updated with the new schedule's cost.
+  const { recomputeScheduleCost } = await import('./billing');
+  await recomputeScheduleCost(newSchedulePayload.id);
+  
+  notifyUpdate('schedulesOfWork');
 };

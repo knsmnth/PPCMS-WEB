@@ -223,10 +223,6 @@ export default function Facilities() {
                   ₱{(f.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </TableCell>
                 <TableCell style={{ textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center' }}>
-                  <Button variant="ghost" size="sm" onClick={() => navigate(`/projects?facilityId=${f.id}`)}>
-                    Browse Projects
-                    <ArrowRight size={14} />
-                  </Button>
                   <button 
                     onClick={() => {
                       setEditingFacility(f);

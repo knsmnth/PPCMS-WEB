@@ -96,93 +96,167 @@ export const cascadeDuplicateProject = async ({ sourceProjectId, newProjectPaylo
   await executeCreate('projects', newProjectPayload);
 
   const allSchedules = await getAllFromDB('schedulesOfWork');
-  const schedules = allSchedules.filter(s => s.projectId === sourceProjectId);
+  const sourceSchedules = allSchedules.filter(s => s.projectId === sourceProjectId);
 
-  for (const schedule of schedules) {
-    const newScheduleId = crypto.randomUUID();
-    const newSchedule = {
-      ...schedule,
-      id: newScheduleId,
-      projectId: newProjectPayload.id,
-      createdAt: new Date().toISOString()
-    };
-    await executeCreate('schedulesOfWork', newSchedule);
+  // ── Build a complete old-ID → new-ID map upfront so sub-schedule parentIds
+  //    can be remapped correctly even before the parent schedule is written.
+  const idMap = new Map(); // sourceId -> newId
+  for (const s of sourceSchedules) {
+    idMap.set(s.id, crypto.randomUUID());
+  }
 
-    const allSummaries = await getAllFromDB('scheduleSummaries');
-    const summaries = allSummaries.filter(sum => sum.scheduleOfWorkId === schedule.id);
+  const allSummaries = await getAllFromDB('scheduleSummaries');
+  const allItems     = await getAllFromDB('summaryItems');
 
+  // Helper: copy summaries + items from one schedule to another
+  const copySummariesAndItems = async (sourceId, destId) => {
+    const summaries = allSummaries.filter(s => s.scheduleOfWorkId === sourceId);
     for (const summary of summaries) {
       const newSummaryId = crypto.randomUUID();
-      const newSummary = {
-        ...summary,
-        id: newSummaryId,
-        scheduleOfWorkId: newScheduleId,
-        createdAt: new Date().toISOString()
-      };
-      await executeCreate('scheduleSummaries', newSummary);
-
-      const allItems = await getAllFromDB('summaryItems');
-      const items = allItems.filter(item => item.summaryId === summary.id);
-
+      const items = allItems.filter(i => i.summaryId === summary.id);
+      let summaryTotal = 0;
       for (const item of items) {
-        const newItem = {
+        await executeCreate('summaryItems', {
           ...item,
           id: crypto.randomUUID(),
           summaryId: newSummaryId,
-          createdAt: new Date().toISOString()
-        };
-        await executeCreate('summaryItems', newItem);
+          createdAt: new Date().toISOString(),
+        });
+        summaryTotal += item.totalCost || 0;
       }
+      await executeCreate('scheduleSummaries', {
+        ...summary,
+        id: newSummaryId,
+        scheduleOfWorkId: destId,
+        totalCost: summaryTotal,
+        createdAt: new Date().toISOString(),
+      });
     }
+  };
+
+  // ── Process root schedules first, then sub-schedules (ensures parentId exists)
+  const rootSchedules = sourceSchedules.filter(s => !s.parentId);
+  const subSchedules  = sourceSchedules.filter(s =>  s.parentId);
+
+  for (const schedule of rootSchedules) {
+    const newId = idMap.get(schedule.id);
+    await executeCreate('schedulesOfWork', {
+      ...schedule,
+      id: newId,
+      projectId: newProjectPayload.id,
+      parentId: null,
+      createdAt: new Date().toISOString(),
+    });
+    await copySummariesAndItems(schedule.id, newId);
+  }
+
+  for (const schedule of subSchedules) {
+    const newId       = idMap.get(schedule.id);
+    // Remap parentId to the new project's equivalent parent (falls back to null if orphaned)
+    const newParentId = idMap.get(schedule.parentId) ?? null;
+    await executeCreate('schedulesOfWork', {
+      ...schedule,
+      id: newId,
+      projectId: newProjectPayload.id,
+      parentId: newParentId,
+      createdAt: new Date().toISOString(),
+    });
+    await copySummariesAndItems(schedule.id, newId);
   }
 
   // Ensure full project cost rollup runs after copying all entities
   const { recomputeProjectCost } = await import('./billing');
   await recomputeProjectCost(newProjectPayload.id);
+
+  notifyUpdate('schedulesOfWork');
+  notifyUpdate('scheduleSummaries');
+  notifyUpdate('summaryItems');
 };
 
+/**
+ * Duplicate a single schedule (main or sub) with its full data tree.
+ *
+ * For a MAIN schedule this also clones every child sub-schedule and
+ * their respective summaries + items, remapping parentIds to the new
+ * main schedule's ID.
+ *
+ * Returns { newSchedule, newSubSchedules } so the caller can build a
+ * snapshot for a full work-code reindex.
+ */
 export const cascadeDuplicateSchedule = async ({ sourceScheduleId, newSchedulePayload }) => {
-  // Always use full-scan fallback — index queries return empty silently when
-  // data was Firestore-synced but the IDB index is not yet populated.
   await executeCreate('schedulesOfWork', newSchedulePayload);
 
   const allSummaries = await getAllFromDB('scheduleSummaries');
-  const summaries = allSummaries.filter(s => s.scheduleOfWorkId === sourceScheduleId);
+  const allItems     = await getAllFromDB('summaryItems');
 
-  let newScheduleTotalCost = 0;
-
-  for (const summary of summaries) {
-    const newSummaryId = crypto.randomUUID();
-
-    // Fetch items for this summary via full scan (same reliability reason)
-    const allItems = await getAllFromDB('summaryItems');
-    const items = allItems.filter(i => i.summaryId === summary.id);
-
-    // Copy items first so we can recompute the summary's actual totalCost
-    let summaryTotal = 0;
-    for (const item of items) {
-      await executeCreate('summaryItems', {
-        ...item,
-        id: crypto.randomUUID(),
-        summaryId: newSummaryId,
+  // ── Helper: copy summaries + items ────────────────────────────────────────
+  const copySummariesAndItems = async (sourceId, destId) => {
+    const summaries = allSummaries.filter(s => s.scheduleOfWorkId === sourceId);
+    let scheduleTotal = 0;
+    for (const summary of summaries) {
+      const newSummaryId = crypto.randomUUID();
+      const items = allItems.filter(i => i.summaryId === summary.id);
+      let summaryTotal = 0;
+      for (const item of items) {
+        await executeCreate('summaryItems', {
+          ...item,
+          id: crypto.randomUUID(),
+          summaryId: newSummaryId,
+          createdAt: new Date().toISOString(),
+        });
+        summaryTotal += item.totalCost || 0;
+      }
+      await executeCreate('scheduleSummaries', {
+        ...summary,
+        id: newSummaryId,
+        scheduleOfWorkId: destId,
+        totalCost: summaryTotal,
         createdAt: new Date().toISOString(),
       });
-      summaryTotal += item.totalCost || 0;
+      scheduleTotal += summaryTotal;
     }
+    return scheduleTotal;
+  };
 
-    await executeCreate('scheduleSummaries', {
-      ...summary,
-      id: newSummaryId,
-      scheduleOfWorkId: newSchedulePayload.id,
-      totalCost: summaryTotal,
-      createdAt: new Date().toISOString(),
-    });
+  // ── Copy summaries + items for the main (or sub) schedule ─────────────────
+  await copySummariesAndItems(sourceScheduleId, newSchedulePayload.id);
+
+  // ── Copy child sub-schedules (only relevant when duplicating a main work) ──
+  const allSchedules = await getAllFromDB('schedulesOfWork');
+  const subSchedules = allSchedules
+    .filter(s => s.parentId === sourceScheduleId)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  const newSubSchedules = [];
+  for (const sub of subSchedules) {
+    const newSubId = crypto.randomUUID();
+    const newSub = {
+      ...sub,
+      id:         newSubId,
+      parentId:   newSchedulePayload.id,  // re-parent to the cloned main schedule
+      workCode:   '',                      // corrected by caller's computeWorkCodeUpdates
+      totalCost:  0,
+      isExcluded: newSchedulePayload.isExcluded ?? false,
+      createdAt:  new Date().toISOString(),
+    };
+    await executeCreate('schedulesOfWork', newSub);
+    await copySummariesAndItems(sub.id, newSubId);
+    newSubSchedules.push(newSub);
   }
 
-  // Use the canonical recompute to ensure all parents (project, facility, etc.) 
-  // also get updated with the new schedule's cost.
+  // ── Bottom-up cost recompute ───────────────────────────────────────────────
+  // Sub-schedules MUST be recomputed before the main schedule so that
+  // recomputeScheduleCost(main) reads the correct subsTotal from IDB.
   const { recomputeScheduleCost } = await import('./billing');
+  for (const sub of newSubSchedules) {
+    await recomputeScheduleCost(sub.id);
+  }
+  // Now recompute the main schedule — subsTotal is already populated in IDB
   await recomputeScheduleCost(newSchedulePayload.id);
-  
+
   notifyUpdate('schedulesOfWork');
+  notifyUpdate('scheduleSummaries');
+  notifyUpdate('summaryItems');
+
+  return { newSchedule: newSchedulePayload, newSubSchedules };
 };

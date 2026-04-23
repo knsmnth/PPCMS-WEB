@@ -645,25 +645,52 @@ export default function ProgramOfWorks() {
     const workCode = generateWorkCode(currentProject?.projectCode, parent?.workCode, siblings);
     const maxOrder = siblings.reduce((m, w) => Math.max(m, w.order ?? 0), -1);
 
-    await cascadeDuplicateSchedule({
+    const newScheduleId = crypto.randomUUID();
+    const newSchedulePayload = {
+      ...work,
+      id: newScheduleId,
+      workCode,
+      name: `${work.name} (Copy)`,
+      totalCost: 0,
+      isExcluded: false,
+      order: maxOrder + 1,
+      createdAt: new Date().toISOString(),
+    };
+
+    // cascadeDuplicateSchedule now also clones child sub-schedules and returns them
+    const { newSubSchedules } = await cascadeDuplicateSchedule({
       sourceScheduleId: work.id,
-      newSchedulePayload: {
-        ...work,
-        id: crypto.randomUUID(),
-        workCode,
-        name: `${work.name} (Copy)`,
-        totalCost: 0,
-        isExcluded: false,
-        order: maxOrder + 1,
-        createdAt: new Date().toISOString(),
-      },
+      newSchedulePayload,
     });
-    // Notify all listeners so the new schedule and its summaries appear
-    window.dispatchEvent(new CustomEvent('localDataUpdated', { detail: 'schedulesOfWork' }));
-    window.dispatchEvent(new CustomEvent('localDataUpdated', { detail: 'scheduleSummaries' }));
-    window.dispatchEvent(new CustomEvent('localDataUpdated', { detail: 'summaryItems' }));
+
+    // ── Step 1: Reindex work codes ─────────────────────────────────────────────
+    // cascadeDuplicateSchedule fires notifyUpdate internally, which can cause
+    // worksRef.current to refresh *before* we reach here (race condition).
+    // Always deduplicate by ID to avoid double-entries → wrong indices → .2,.4,.6.
+    if (newSubSchedules.length > 0) {
+      const pCode = projectCodeRef.current;
+      const newIds = new Set([newSchedulePayload.id, ...newSubSchedules.map(s => s.id)]);
+      const allAfter = [
+        ...worksRef.current.filter(w => !newIds.has(w.id)), // strip any already-refreshed copies
+        newSchedulePayload,                                  // main schedule (correct order/workCode)
+        ...newSubSchedules,                                  // sub-schedules (order inherited from source)
+      ];
+      const codeUpdates = computeWorkCodeUpdates(allAfter, pCode);
+      if (codeUpdates.length) await Promise.all(codeUpdates.map(u => updateItem(u)));
+
+      // ── Step 2: Re-run bottom-up cost recompute ──────────────────────────────
+      // The reindex above calls updateItem({ ...sub, order, workCode }) where `sub`
+      // still carries totalCost: 0 (stale from creation time). This overwrites the
+      // correct costs that cascadeDuplicateSchedule's recompute had just stored.
+      // Re-running bottom-up ensures costs are always the LAST write → correct totals.
+      for (const sub of newSubSchedules) {
+        await recomputeScheduleCost(sub.id);
+      }
+      await recomputeScheduleCost(newSchedulePayload.id);
+    }
+
     refresh();
-  }, [projects, works, refresh]);
+  }, [projects, works, refresh, updateItem]);
 
   const openEdit = useCallback((work) => {
     setEditingWork(work);
@@ -914,6 +941,7 @@ export default function ProgramOfWorks() {
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <button
+            id="btn-back-projects"
             onClick={() => navigate(`/projects${project ? `?facilityId=${project.facilityId}` : ''}`)}
             style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.8rem', cursor: 'pointer', marginBottom: '0.5rem', fontWeight: 600 }}
           >
@@ -942,6 +970,7 @@ export default function ProgramOfWorks() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--background)', padding: '0 1rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', width: 260, height: '2.5rem' }}>
             <Search size={16} color="var(--muted-foreground)" />
             <input
+              id="input-search-works"
               type="text"
               placeholder="Search works…"
               value={searchQuery}
@@ -951,16 +980,16 @@ export default function ProgramOfWorks() {
           </div>
 
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <input type="file" accept=".xlsx" ref={fileInputRef} style={{ display: 'none' }} onChange={handleImportExcel} />
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()} title="Import Excel">
+            <input type="file" accept=".xlsx" ref={fileInputRef} style={{ display: 'none' }} onChange={handleImportExcel} id="input-import-excel" />
+            <Button id="btn-import-excel" variant="outline" onClick={() => fileInputRef.current?.click()} title="Import Excel">
               <Upload size={18} />
             </Button>
-            <Button variant="outline" onClick={handleExportExcel} title="Export Excel Template">
+            <Button id="btn-export-excel" variant="outline" onClick={handleExportExcel} title="Export Excel Template">
               <Download size={18} />
             </Button>
           </div>
 
-          <Button onClick={() => { setCreateParentId(null); setCreateOpen(true); }}>
+          <Button id="btn-new-work" onClick={() => { setCreateParentId(null); setCreateOpen(true); }}>
             <Plus size={18} /> New Work
           </Button>
         </div>

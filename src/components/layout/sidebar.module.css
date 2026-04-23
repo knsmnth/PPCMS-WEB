@@ -148,26 +148,40 @@
   padding: 0 0.625rem;
   letter-spacing: 0.08em;
   white-space: nowrap;
-  overflow: hidden;
+  /* overflow is intentionally NOT set here — the span's max-width transition
+     handles clipping smoothly; the sidebar's own overflow:hidden is the backstop */
+  display: flex;
+  align-items: center;
+  min-height: 1.25rem;
 }
 
+/* ── Section title text — fades AND slides out on collapse ── */
 .sectionTitle span {
   display: inline-block;
   opacity: 1;
-  transition: opacity var(--sidebar-transition);
+  max-width: 200px;   /* wider than the longest label ('Administration') */
+  overflow: hidden;
+  white-space: nowrap;
+  transition:
+    opacity var(--sidebar-transition),
+    max-width var(--sidebar-transition);
 }
 
 .collapsed .sectionTitle span {
   opacity: 0;
+  max-width: 0;
+  pointer-events: none;
 }
 
-.collapsed .sectionTitle::before {
+/* ── Collapsed divider line (::after avoids being a flex item like ::before would) ── */
+.collapsed .sectionTitle::after {
   content: '';
   display: block;
   height: 1px;
+  width: 100%;
   background: var(--border);
-  margin: 0.5rem 0;
-  opacity: 0.5;
+  opacity: 0.45;
+  border-radius: 1px;
 }
 
 /* ─────────────────────────────────────────
@@ -342,4 +356,16 @@
   justify-content: center;
   padding: 0.6rem 0;
   gap: 0;
+}
+
+/* ─────────────────────────────────────────
+   Responsive — Desktop Only
+   This is a desktop management tool.
+   Hide the sidebar entirely on tablet/mobile
+   so the main content fills the viewport.
+   ───────────────────────────────────────── */
+@media (max-width: 1023px) {
+  .sidebarWrapper {
+    display: none !important;
+  }
 }

@@ -36,11 +36,19 @@ const DialogContent = React.forwardRef(({ className, children, ...props }, ref) 
 ));
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
+/** Sticky header — title lives here */
 const DialogHeader = ({ className, ...props }) => (
   <div className={clsx(styles.header, className)} {...props} />
 );
 DialogHeader.displayName = "DialogHeader";
 
+/** Scrollable body — all form fields go here */
+const DialogBody = ({ className, ...props }) => (
+  <div className={clsx(styles.body, className)} {...props} />
+);
+DialogBody.displayName = "DialogBody";
+
+/** Sticky footer — action buttons go here */
 const DialogFooter = ({ className, ...props }) => (
   <div className={clsx(styles.footer, className)} {...props} />
 );
@@ -64,6 +72,7 @@ export {
   DialogClose,
   DialogContent,
   DialogHeader,
+  DialogBody,
   DialogFooter,
   DialogTitle,
   DialogDescription,

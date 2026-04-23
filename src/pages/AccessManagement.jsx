@@ -5,7 +5,7 @@ import { collection, query, getDocs, doc, setDoc, deleteDoc } from 'firebase/fir
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose, DialogBody, DialogFooter } from '../components/ui/dialog';
 import { Shield, UserPlus, Trash2, ShieldAlert } from 'lucide-react';
 import { Select } from '../components/ui/select';
 
@@ -121,7 +121,7 @@ export default function AccessManagement() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader><DialogTitle>Grant System Access</DialogTitle></DialogHeader>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
+              <DialogBody>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Google Email Address</label>
                   <Input 
@@ -141,8 +141,10 @@ export default function AccessManagement() {
                     <option value="super_admin">Super Administrator (Full System Control)</option>
                   </Select>
                 </div>
-                <Button onClick={handleAddUser} disabled={!newEmail} style={{ marginTop: '0.5rem' }}>Grant Access</Button>
-              </div>
+              </DialogBody>
+              <DialogFooter>
+                <Button onClick={handleAddUser} disabled={!newEmail}>Grant Access</Button>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>

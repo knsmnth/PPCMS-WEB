@@ -5,7 +5,7 @@ import { useCollection } from '../hooks/useData';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose, DialogBody, DialogFooter } from '../components/ui/dialog';
 import { cascadeCostUpdate } from '../lib/billing';
 import { cascadeDelete } from '../lib/cascade';
 import { SelectCombo } from '../components/ui/select-combo';
@@ -168,7 +168,7 @@ export default function SummaryWorkspace() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>Categorize New Work</DialogTitle></DialogHeader>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
+            <DialogBody>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Group Classification</label>
                 <Select 
@@ -176,7 +176,6 @@ export default function SummaryWorkspace() {
                   onChange={(e) => setSummaryType(e.target.value)}
                 >
                   <option value="material">Material Assets</option>
-
                   <option value="labor">Personnel & Labor</option>
                 </Select>
               </div>
@@ -184,8 +183,10 @@ export default function SummaryWorkspace() {
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Category Title</label>
                 <Input placeholder="e.g. Site Groundworks" value={summaryName} onChange={(e) => setSummaryName(e.target.value)} />
               </div>
+            </DialogBody>
+            <DialogFooter>
               <DialogClose asChild><Button onClick={handleCreateSummary} disabled={!scheduleId}>Initialize Category</Button></DialogClose>
-            </div>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </header>
@@ -280,7 +281,7 @@ export default function SummaryWorkspace() {
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Work Component</DialogTitle></DialogHeader>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
+          <DialogBody>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Group Classification</label>
               <Select 
@@ -288,7 +289,6 @@ export default function SummaryWorkspace() {
                 onChange={(e) => setEditSummaryType(e.target.value)}
               >
                 <option value="material">Material Assets</option>
-
                 <option value="labor">Personnel & Labor</option>
               </Select>
             </div>
@@ -296,8 +296,10 @@ export default function SummaryWorkspace() {
               <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Category Title</label>
               <Input placeholder="e.g. Site Groundworks" value={editSummaryName} onChange={(e) => setEditSummaryName(e.target.value)} />
             </div>
-            <Button onClick={handleEditSummary} style={{ marginTop: '0.5rem' }}>Confirm Edits</Button>
-          </div>
+          </DialogBody>
+          <DialogFooter>
+            <Button onClick={handleEditSummary}>Confirm Edits</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

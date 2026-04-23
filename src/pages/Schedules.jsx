@@ -6,7 +6,7 @@ import {
 } from '../components/ui/table';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '../components/ui/dialog';
 import { Calendar, Plus, ArrowLeft, Edit2, Trash2, Search, GripVertical, Copy, Download, Upload, ChevronDown, ChevronRight, CornerDownRight } from 'lucide-react';
 import { cascadeDelete, cascadeDuplicateSchedule } from '../lib/cascade';
 import { recomputeProjectCost, recomputeScheduleCost } from '../lib/billing'; // ground-truth recompute
@@ -137,11 +137,11 @@ function CreateWorkDialog({ open, onOpenChange, projectName, projectId, onSubmit
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
-      <DialogContent>
+    <DialogContent>
         <DialogHeader>
           <DialogTitle>Create New Work</DialogTitle>
         </DialogHeader>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1rem' }}>
+        <DialogBody>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
             <label style={labelStyle}>Project</label>
             <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--primary)', padding: '0.5rem 0.75rem', background: 'var(--secondary)', borderRadius: 'var(--radius)' }}>
@@ -166,10 +166,12 @@ function CreateWorkDialog({ open, onOpenChange, projectName, projectId, onSubmit
               onChange={e => setDescription(e.target.value)}
             />
           </div>
+        </DialogBody>
+        <DialogFooter>
           <Button onClick={submit} disabled={!name.trim() || !projectId}>
             Register Work
           </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -192,11 +194,11 @@ function EditWorkDialog({ open, onOpenChange, work, onSubmit }) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+    <DialogContent>
         <DialogHeader>
           <DialogTitle>Edit Work</DialogTitle>
         </DialogHeader>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1rem' }}>
+        <DialogBody>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
             <label style={labelStyle}>Work Name *</label>
             <Input
@@ -213,8 +215,10 @@ function EditWorkDialog({ open, onOpenChange, work, onSubmit }) {
               onChange={e => setDescription(e.target.value)}
             />
           </div>
+        </DialogBody>
+        <DialogFooter>
           <Button onClick={submit} disabled={!name.trim()}>Save Changes</Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

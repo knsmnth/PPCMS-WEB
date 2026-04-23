@@ -4,7 +4,7 @@ import { useCollection } from '../hooks/useData';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose, DialogBody, DialogFooter } from '../components/ui/dialog';
 import { Folder, Plus, Edit2, Trash2, Search, Copy, ChevronDown, ArrowRight, Download, Upload } from 'lucide-react';
 import { cascadeDelete, cascadeDuplicateProject } from '../lib/cascade';
 import { exportProjectsTemplate, parseProjectsExcel } from '../lib/excel';
@@ -17,13 +17,13 @@ export default function Projects() {
   const [searchParams] = useSearchParams();
   const facilityId = searchParams.get('facilityId');
   const query = facilityId ? [{ field: 'facilityId', operator: '==', value: facilityId }] : [];
-  
+
   const { data: projects, createItem, updateItem, refresh } = useCollection('projects', query);
   const { data: facilities } = useCollection('facilities');
   const { data: campuses } = useCollection('campuses');
   const facility = facilityId ? facilities.find(f => f.id === facilityId) : null;
   const initialCampusId = facility ? facility.campusId : '';
-  
+
   const navigate = useNavigate();
 
   // Create state
@@ -94,16 +94,16 @@ export default function Projects() {
 
   const processedData = useMemo(() => {
     let result = projects.filter(p => {
-      const matchesSearch = p.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                            p.projectCode?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.projectCode?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesPriority = priorityFilter === 'All' || p.priority === priorityFilter;
-      
+
       let matchesYear = true;
       if (yearFilter !== 'All') {
         const pYear = '20' + (p.projectCode?.split('.')[0] || '');
         if (pYear !== yearFilter) matchesYear = false;
       }
-      
+
       return matchesSearch && matchesPriority && matchesYear;
     });
 
@@ -153,12 +153,12 @@ export default function Projects() {
     if (!name || !selectedFacilityId) return;
     const id = crypto.randomUUID();
     const pCode = generateProjectCode(projects);
-    const newProject = { 
-      id, 
-      facilityId: selectedFacilityId, 
-      name, 
+    const newProject = {
+      id,
+      facilityId: selectedFacilityId,
+      name,
       description,
-      status, 
+      status,
       priority,
       projectCode: pCode,
       totalCost: 0,
@@ -178,7 +178,7 @@ export default function Projects() {
 
   const handleEdit = async () => {
     if (!editName || !editingProject) return;
-    
+
     const updates = {
       ...editingProject,
       name: editName,
@@ -196,7 +196,7 @@ export default function Projects() {
         { status: editStatus, changedAt: Date.now() }
       ];
     }
-    
+
     await updateItem(updates);
     refresh();
     setEditDialogOpen(false);
@@ -278,13 +278,13 @@ export default function Projects() {
       const rows = await parseProjectsExcel(file);
       let count = 0;
       let currentProjects = [...projects];
-      
+
       for (const row of rows) {
         if (!row.name) continue;
-        
+
         const fac = facilities.find(f => f.name === row.facilityName);
         const facilityIdToSave = fac ? fac.id : '';
-        
+
         if (row.id) {
           // Update existing
           const existing = currentProjects.find(p => p.id === row.id);
@@ -361,28 +361,28 @@ export default function Projects() {
             Project Overview
           </h1>
         </div>
-        
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-          
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-             <Select value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
-                <option value="All">All Years</option>
-                <option value={new Date().getFullYear().toString()}>Current Year</option>
-             </Select>
-             <Select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)}>
-                <option value="All">All Priorities</option>
-                <option value="Very High">Very High</option>
-                <option value="High">High</option>
-                <option value="Medium">Medium</option>
-                <option value="Low">Low</option>
-             </Select>
+            <Select value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
+              <option value="All">All Years</option>
+              <option value={new Date().getFullYear().toString()}>Current Year</option>
+            </Select>
+            <Select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)}>
+              <option value="All">All Priorities</option>
+              <option value="Very High">Very High</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </Select>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'var(--background)', padding: '0 1rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', width: '300px', height: '2.5rem' }}>
             <Search size={16} color="var(--muted-foreground)" />
-            <input 
-              type="text" 
-              placeholder="Search components..." 
+            <input
+              type="text"
+              placeholder="Search components..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', fontSize: '0.9rem', color: 'var(--foreground)' }}
@@ -404,33 +404,31 @@ export default function Projects() {
                 Initialize Project
               </Button>
             </DialogTrigger>
-              <DialogContent style={{ maxHeight: '85vh', overflowY: 'visible' }} onInteractOutside={(e) => e.preventDefault()}>
+            <DialogContent onInteractOutside={(e) => e.preventDefault()}>
               <DialogHeader><DialogTitle>New Project Specification</DialogTitle></DialogHeader>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                  <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Campus</label>
-                    <SelectCombo 
-                      value={selectedCampusId} 
-                      onChange={(val) => {
-                        setSelectedCampusId(val);
-                        setSelectedFacilityId('');
-                      }} 
-                      options={campuses.map(c => ({ value: c.id, label: c.name }))}
-                      placeholder="Select campus..."
-                      disabled={false}
-                    />
-                  </div>
-                  <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Facility Context</label>
-                    <SelectCombo 
-                      value={selectedFacilityId} 
-                      onChange={setSelectedFacilityId} 
-                      options={availableFacilities.map(f => ({ value: f.id, label: f.name }))}
-                      placeholder="Select facility..."
-                      disabled={!selectedCampusId}
-                    />
-                  </div>
+              <DialogBody>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Campus</label>
+                  <SelectCombo
+                    value={selectedCampusId}
+                    onChange={(val) => {
+                      setSelectedCampusId(val);
+                      setSelectedFacilityId('');
+                    }}
+                    options={campuses.map(c => ({ value: c.id, label: c.name }))}
+                    placeholder="Select campus..."
+                    disabled={false}
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Facility</label>
+                  <SelectCombo
+                    value={selectedFacilityId}
+                    onChange={setSelectedFacilityId}
+                    options={availableFacilities.map(f => ({ value: f.id, label: f.name }))}
+                    placeholder="Select facility..."
+                    disabled={!selectedCampusId}
+                  />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Project Name</label>
@@ -441,29 +439,29 @@ export default function Projects() {
                   <Input placeholder="e.g. Replacement of roofing..." value={description} onChange={(e) => setDescription(e.target.value)} />
                 </div>
                 <div style={{ display: 'flex', gap: '1rem' }}>
-                    <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
                     <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Priority</label>
                     <Select value={priority} onChange={(e) => setPriority(e.target.value)}>
-                        <option value="Low">Low - Light Blue</option>
-                        <option value="Medium">Medium - Green</option>
-                        <option value="High">High - Yellow</option>
-                        <option value="Very High">Very High - Red</option>
+                      <option value="Low">Low - Light Blue</option>
+                      <option value="Medium">Medium - Green</option>
+                      <option value="High">High - Yellow</option>
+                      <option value="Very High">Very High - Red</option>
                     </Select>
-                    </div>
-                    <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
+                  </div>
+                  <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
                     <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Status</label>
                     <Select value={status} onChange={(e) => setStatus(e.target.value)}>
-                        <option value="Accepted">Accepted</option>
-                        <option value="Planning Phase">Planning Phase</option>
-                        <option value="On-Going">On-Going</option>
-                        <option value="On Review">On Review</option>
-                        <option value="For Submission">For Submission</option>
-                        <option value="Closed">Closed</option>
+                      <option value="Accepted">Accepted</option>
+                      <option value="Planning Phase">Planning Phase</option>
+                      <option value="On-Going">On-Going</option>
+                      <option value="On Review">On Review</option>
+                      <option value="For Submission">For Submission</option>
+                      <option value="Closed">Closed</option>
                     </Select>
-                    </div>
+                  </div>
                 </div>
                 <div style={{ display: 'flex', gap: '1rem' }}>
-                    <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
                     <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Approved Budget (Php)</label>
                     <Input
                       type="text"
@@ -472,10 +470,12 @@ export default function Projects() {
                       value={formatMoneyInput(approvedBudget)}
                       onChange={(e) => setApprovedBudget(normalizeMoneyInput(e.target.value))}
                     />
-                    </div>
+                  </div>
                 </div>
+              </DialogBody>
+              <DialogFooter>
                 <DialogClose asChild><Button onClick={handleCreate} disabled={!selectedFacilityId}>Create Project Instance</Button></DialogClose>
-              </div>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
@@ -523,106 +523,106 @@ export default function Projects() {
               const pFacility = facilities.find(f => f.id === p.facilityId);
               const pColor = getPriorityColor(p.priority);
               const sColor = getStatusColor(p.status);
-              
+
               return (
-              <TableRow 
-                key={p.id} 
-                ref={rowVirtualizer.measureElement} 
-                data-index={virtualRow.index} 
-                style={{ cursor: 'pointer', opacity: p.isExcluded ? 0.6 : 1 }}
-                onClick={() => navigate(`/schedules?projectId=${p.id}`)}
-                className="hover:bg-muted/50"
-              >
-                <TableCell style={{ padding: '0.75rem 0.5rem', width: 40, textAlign: 'center' }}>
-                  <input
-                    type="checkbox"
-                    checked={!!p.isExcluded}
-                    onChange={(e) => handleToggleExclude(e, p)}
-                    onClick={e => e.stopPropagation()}
-                    title={p.isExcluded ? 'Excluded — click to include' : 'Included — click to exclude'}
-                    style={{ width: 15, height: 15, cursor: 'pointer', accentColor: 'var(--primary)' }}
-                  />
-                </TableCell>
-                <TableCell style={{ textAlign: 'center', fontWeight: 800, fontSize: '1.1rem', color: p.isExcluded ? 'var(--muted-foreground)' : '#092e20', textDecoration: p.isExcluded ? 'line-through' : 'none' }}>
-                  {p.projectCode || '---'}
-                </TableCell>
-                <TableCell style={{ textDecoration: p.isExcluded ? 'line-through' : 'none' }}>
-                  <div style={{ fontWeight: 800, fontSize: '1.35rem', color: p.isExcluded ? 'var(--muted-foreground)' : '#092e20', marginBottom: '0.1rem', letterSpacing: '-0.02em', lineHeight: '1.2' }}>{p.name}</div>
-                  <div style={{ fontSize: '0.9rem', color: p.isExcluded ? 'var(--muted-foreground)' : '#26513A', fontWeight: 500, marginBottom: '0.15rem' }}>
-                    {pFacility ? `${pFacility.name} (${pFacility.id?.substring(0,8).toUpperCase()})` : 'Unknown Facility'}
-                  </div>
-                  {p.description && (
-                    <div style={{ fontSize: '0.85rem', color: p.isExcluded ? 'var(--muted-foreground)' : '#a1a1aa', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.4' }}>
-                      {p.description}
+                <TableRow
+                  key={p.id}
+                  ref={rowVirtualizer.measureElement}
+                  data-index={virtualRow.index}
+                  style={{ cursor: 'pointer', opacity: p.isExcluded ? 0.6 : 1 }}
+                  onClick={() => navigate(`/schedules?projectId=${p.id}`)}
+                  className="hover:bg-muted/50"
+                >
+                  <TableCell style={{ padding: '0.75rem 0.5rem', width: 40, textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={!!p.isExcluded}
+                      onChange={(e) => handleToggleExclude(e, p)}
+                      onClick={e => e.stopPropagation()}
+                      title={p.isExcluded ? 'Excluded — click to include' : 'Included — click to exclude'}
+                      style={{ width: 15, height: 15, cursor: 'pointer', accentColor: 'var(--primary)' }}
+                    />
+                  </TableCell>
+                  <TableCell style={{ textAlign: 'center', fontWeight: 800, fontSize: '1.1rem', color: p.isExcluded ? 'var(--muted-foreground)' : '#092e20', textDecoration: p.isExcluded ? 'line-through' : 'none' }}>
+                    {p.projectCode || '---'}
+                  </TableCell>
+                  <TableCell style={{ textDecoration: p.isExcluded ? 'line-through' : 'none' }}>
+                    <div style={{ fontWeight: 800, fontSize: '1.35rem', color: p.isExcluded ? 'var(--muted-foreground)' : '#092e20', marginBottom: '0.1rem', letterSpacing: '-0.02em', lineHeight: '1.2' }}>{p.name}</div>
+                    <div style={{ fontSize: '0.9rem', color: p.isExcluded ? 'var(--muted-foreground)' : '#26513A', fontWeight: 500, marginBottom: '0.15rem' }}>
+                      {pFacility ? `${pFacility.name} (${pFacility.id?.substring(0, 8).toUpperCase()})` : 'Unknown Facility'}
                     </div>
-                  )}
-                </TableCell>
-                <TableCell style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                  <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-                    <select
-                      value={p.priority || 'Medium'}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => handleInlinePriorityChange(e, p, e.target.value)}
-                      style={{
-                        appearance: 'none',
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        padding: '0.3rem 1.6rem 0.3rem 0.7rem',
-                        borderRadius: '0.2rem',
-                        backgroundColor: pColor.bg,
-                        color: pColor.text,
-                        border: 'none',
-                        outline: 'none',
-                        cursor: 'pointer'
-                      }}
-                    >
+                    {p.description && (
+                      <div style={{ fontSize: '0.85rem', color: p.isExcluded ? 'var(--muted-foreground)' : '#a1a1aa', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.4' }}>
+                        {p.description}
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                      <select
+                        value={p.priority || 'Medium'}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => handleInlinePriorityChange(e, p, e.target.value)}
+                        style={{
+                          appearance: 'none',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          padding: '0.3rem 1.6rem 0.3rem 0.7rem',
+                          borderRadius: '0.2rem',
+                          backgroundColor: pColor.bg,
+                          color: pColor.text,
+                          border: 'none',
+                          outline: 'none',
+                          cursor: 'pointer'
+                        }}
+                      >
                         <option value="Low">Low</option>
                         <option value="Medium">Medium</option>
                         <option value="High">High</option>
                         <option value="Very High">Very High</option>
-                    </select>
-                    <ChevronDown size={14} style={{ position: 'absolute', right: '0.4rem', pointerEvents: 'none', color: pColor.text, opacity: 0.8 }} />
-                  </div>
-                </TableCell>
-                <TableCell style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                  <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-                    <select
-                      value={p.status || 'Planning Phase'}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => handleInlineStatusChange(e, p, e.target.value)}
-                      style={{
-                        appearance: 'none',
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        padding: '0.3rem 1.6rem 0.3rem 0.7rem',
-                        borderRadius: '0.2rem',
-                        backgroundColor: sColor.bg,
-                        color: sColor.text,
-                        border: 'none',
-                        outline: 'none',
-                        cursor: 'pointer'
-                      }}
-                    >
+                      </select>
+                      <ChevronDown size={14} style={{ position: 'absolute', right: '0.4rem', pointerEvents: 'none', color: pColor.text, opacity: 0.8 }} />
+                    </div>
+                  </TableCell>
+                  <TableCell style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                      <select
+                        value={p.status || 'Planning Phase'}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => handleInlineStatusChange(e, p, e.target.value)}
+                        style={{
+                          appearance: 'none',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          padding: '0.3rem 1.6rem 0.3rem 0.7rem',
+                          borderRadius: '0.2rem',
+                          backgroundColor: sColor.bg,
+                          color: sColor.text,
+                          border: 'none',
+                          outline: 'none',
+                          cursor: 'pointer'
+                        }}
+                      >
                         <option value="Accepted">Accepted</option>
                         <option value="Planning Phase">Planning Phase</option>
                         <option value="On-Going">On-Going</option>
                         <option value="On Review">On Review</option>
                         <option value="For Submission">For Submission</option>
                         <option value="Closed">Closed</option>
-                    </select>
-                    <ChevronDown size={14} style={{ position: 'absolute', right: '0.4rem', pointerEvents: 'none', color: sColor.text, opacity: 0.8 }} />
-                  </div>
-                </TableCell>
-                <TableCell style={{ textAlign: 'center', padding: '0.5rem', textDecoration: p.isExcluded ? 'line-through' : 'none' }}>
+                      </select>
+                      <ChevronDown size={14} style={{ position: 'absolute', right: '0.4rem', pointerEvents: 'none', color: sColor.text, opacity: 0.8 }} />
+                    </div>
+                  </TableCell>
+                  <TableCell style={{ textAlign: 'center', padding: '0.5rem', textDecoration: p.isExcluded ? 'line-through' : 'none' }}>
                     <div style={{ fontWeight: 800, fontSize: '1.05rem', color: p.isExcluded ? 'var(--muted-foreground)' : 'var(--primary)' }}>
-                     ₱{(p.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      ₱{(p.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', fontWeight: 500, marginTop: '0.1rem' }}>
-                     Budget: ₱{(p.approvedBudget || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      ₱{(p.approvedBudget || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </div>
-                </TableCell>
-                <TableCell style={{ textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center', height: '100%' }}>
-                  <button 
+                  </TableCell>
+                  <TableCell style={{ textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center', height: '100%' }}>
+                    <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setEditingProject(p);
@@ -632,36 +632,37 @@ export default function Projects() {
                         setEditPriority(p.priority || 'Medium');
                         const f = facilities.find(fac => fac.id === p.facilityId);
                         setEditCampusId(f ? f.campusId : '');
-                      setEditFacilityId(p.facilityId || '');
-                      setEditTotalCost(String(p.totalCost ?? ''));
-                      setEditApprovedBudget(String(p.approvedBudget ?? ''));
-                      setEditDialogOpen(true);
-                    }}
-                    style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.25rem' }}
-                    title="Edit Project"
-                  >
-                    <Edit2 size={16} />
-                  </button>
-                  <button 
-                    onClick={(e) => handleDelete(e, p.id)}
-                    style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.25rem' }}
-                    onMouseOver={(e) => e.currentTarget.style.color = 'var(--destructive)'}
-                    onMouseOut={(e) => e.currentTarget.style.color = '#d4d4d8'}
-                    title="Delete Project"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                  <button 
-                    onClick={(e) => handleDuplicate(e, p)}
-                    style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.25rem' }}
-                    title="Duplicate Project"
-                  >
-                    <Copy size={16} />
-                  </button>
-                </TableCell>
-              </TableRow>
-            )})}
-            
+                        setEditFacilityId(p.facilityId || '');
+                        setEditTotalCost(String(p.totalCost ?? ''));
+                        setEditApprovedBudget(String(p.approvedBudget ?? ''));
+                        setEditDialogOpen(true);
+                      }}
+                      style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.25rem' }}
+                      title="Edit Project"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button
+                      onClick={(e) => handleDelete(e, p.id)}
+                      style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.25rem' }}
+                      onMouseOver={(e) => e.currentTarget.style.color = 'var(--destructive)'}
+                      onMouseOut={(e) => e.currentTarget.style.color = '#d4d4d8'}
+                      title="Delete Project"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                    <button
+                      onClick={(e) => handleDuplicate(e, p)}
+                      style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.25rem' }}
+                      title="Duplicate Project"
+                    >
+                      <Copy size={16} />
+                    </button>
+                  </TableCell>
+                </TableRow>
+              )
+            })}
+
             {paddingBottom > 0 && (
               <tr style={{ height: `${paddingBottom}px`, border: 'none' }}>
                 <td colSpan={6} style={{ padding: 0, border: 0 }}></td>
@@ -672,32 +673,30 @@ export default function Projects() {
       </div>
 
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent style={{ maxHeight: '90vh', overflowY: 'visible' }} onInteractOutside={(e) => e.preventDefault()}>
+        <DialogContent onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader><DialogTitle>Edit Project details</DialogTitle></DialogHeader>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1rem' }}>
-               <div style={{ display: 'flex', gap: '1rem' }}>
-                  <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Campus</label>
-                    <SelectCombo 
-                      value={editCampusId} 
-                      onChange={(val) => {
-                        setEditCampusId(val);
-                        setEditFacilityId('');
-                      }} 
-                      options={campuses.map(c => ({ value: c.id, label: c.name }))}
-                      placeholder="Select campus..."
-                    />
-                  </div>
-                  <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Facility Context</label>
-                    <SelectCombo 
-                      value={editFacilityId} 
-                      onChange={setEditFacilityId} 
-                      options={availableEditFacilities.map(f => ({ value: f.id, label: f.name }))}
-                      placeholder="Select facility..."
-                    />
-                  </div>
-                </div>
+          <DialogBody>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Campus</label>
+              <SelectCombo
+                value={editCampusId}
+                onChange={(val) => {
+                  setEditCampusId(val);
+                  setEditFacilityId('');
+                }}
+                options={campuses.map(c => ({ value: c.id, label: c.name }))}
+                placeholder="Select campus..."
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Facility</label>
+              <SelectCombo
+                value={editFacilityId}
+                onChange={setEditFacilityId}
+                options={availableEditFacilities.map(f => ({ value: f.id, label: f.name }))}
+                placeholder="Select facility..."
+              />
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Project Name</label>
               <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
@@ -707,29 +706,29 @@ export default function Projects() {
               <Input value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
             </div>
             <div style={{ display: 'flex', gap: '1rem' }}>
-                <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Priority</label>
                 <Select value={editPriority} onChange={(e) => setEditPriority(e.target.value)}>
-                    <option value="Low">Low - Light Blue</option>
-                    <option value="Medium">Medium - Green</option>
-                    <option value="High">High - Yellow</option>
-                    <option value="Very High">Very High - Red</option>
+                  <option value="Low">Low - Light Blue</option>
+                  <option value="Medium">Medium - Green</option>
+                  <option value="High">High - Yellow</option>
+                  <option value="Very High">Very High - Red</option>
                 </Select>
-                </div>
-                <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
-                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Status</label>
-                 <Select value={editStatus} onChange={(e) => setEditStatus(e.target.value)}>
-                    <option value="Accepted">Accepted</option>
-                    <option value="Planning Phase">Planning Phase</option>
-                    <option value="On-Going">On-Going</option>
-                    <option value="On Review">On Review</option>
-                    <option value="For Submission">For Submission</option>
-                    <option value="Closed">Closed</option>
-                 </Select>
-                </div>
+              </div>
+              <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Status</label>
+                <Select value={editStatus} onChange={(e) => setEditStatus(e.target.value)}>
+                  <option value="Accepted">Accepted</option>
+                  <option value="Planning Phase">Planning Phase</option>
+                  <option value="On-Going">On-Going</option>
+                  <option value="On Review">On Review</option>
+                  <option value="For Submission">For Submission</option>
+                  <option value="Closed">Closed</option>
+                </Select>
+              </div>
             </div>
             <div style={{ display: 'flex', gap: '1rem' }}>
-                <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Total Cost</label>
                 <Input
                   type="text"
@@ -737,8 +736,8 @@ export default function Projects() {
                   value={formatMoneyInput(editTotalCost)}
                   onChange={(e) => setEditTotalCost(normalizeMoneyInput(e.target.value))}
                 />
-                </div>
-                <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
+              </div>
+              <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Approved Budget</label>
                 <Input
                   type="text"
@@ -746,25 +745,27 @@ export default function Projects() {
                   value={formatMoneyInput(editApprovedBudget)}
                   onChange={(e) => setEditApprovedBudget(normalizeMoneyInput(e.target.value))}
                 />
-                </div>
+              </div>
             </div>
 
             {editingProject?.statusHistory && editingProject.statusHistory.length > 0 && (
-                <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
-                    <label style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>Status History</label>
-                    <ul style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', listStyle: 'none', padding: 0 }}>
-                        {editingProject.statusHistory.map((sh, idx) => (
-                            <li key={idx} style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', display: 'flex', justifyContent: 'space-between', backgroundColor: '#f4f4f5', padding: '0.5rem', borderRadius: '0.25rem' }}>
-                                <strong>{sh.status}</strong>
-                                <span>{new Date(sh.changedAt).toLocaleString()}</span>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
+              <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+                <label style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>Status History</label>
+                <ul style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', listStyle: 'none', padding: 0 }}>
+                  {editingProject.statusHistory.map((sh, idx) => (
+                    <li key={idx} style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', display: 'flex', justifyContent: 'space-between', backgroundColor: '#f4f4f5', padding: '0.5rem', borderRadius: '0.25rem' }}>
+                      <strong>{sh.status}</strong>
+                      <span>{new Date(sh.changedAt).toLocaleString()}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
 
-            <Button onClick={handleEdit} style={{ marginTop: '0.5rem' }}>Save Changes</Button>
-          </div>
+          </DialogBody>
+          <DialogFooter>
+            <Button onClick={handleEdit}>Save Changes</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

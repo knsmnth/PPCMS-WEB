@@ -4,7 +4,7 @@ import { useCollection } from '../hooks/useData';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose, DialogBody, DialogFooter } from '../components/ui/dialog';
 import { Building, Plus, ArrowRight, ArrowLeft, Edit2, Trash2, Search } from 'lucide-react';
 import { cascadeDelete } from '../lib/cascade';
 import { SelectCombo } from '../components/ui/select-combo';
@@ -139,7 +139,7 @@ export default function Facilities() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader><DialogTitle>New Facility</DialogTitle></DialogHeader>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
+              <DialogBody>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Campus Assignment</label>
                   <SelectCombo 
@@ -158,10 +158,12 @@ export default function Facilities() {
                   <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Facility Category</label>
                   <Input placeholder="e.g. Academic, Maintenance" value={type} onChange={(e) => setType(e.target.value)} />
                 </div>
+              </DialogBody>
+              <DialogFooter>
                 <DialogClose asChild>
                   <Button onClick={handleCreate} disabled={!selectedCampusId}>Register Facility</Button>
                 </DialogClose>
-              </div>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
@@ -262,7 +264,7 @@ export default function Facilities() {
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Facility</DialogTitle></DialogHeader>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
+          <DialogBody>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Facility Name</label>
               <Input placeholder="e.g. Science Laboratory" value={editName} onChange={(e) => setEditName(e.target.value)} />
@@ -271,8 +273,10 @@ export default function Facilities() {
               <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Facility Category</label>
               <Input placeholder="e.g. Academic, Maintenance" value={editType} onChange={(e) => setEditType(e.target.value)} />
             </div>
-            <Button onClick={handleEdit} style={{ marginTop: '0.5rem' }}>Save Changes</Button>
-          </div>
+          </DialogBody>
+          <DialogFooter>
+            <Button onClick={handleEdit}>Save Changes</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -4,7 +4,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose, DialogBody, DialogFooter } from '../components/ui/dialog';
 import { Package, Plus, Trash2, Search, Info, Users, Wrench, History, Edit2 } from 'lucide-react';
 
 function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
@@ -96,7 +96,7 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
             <DialogTrigger asChild><Button size="md"><Plus size={18} />New Entry</Button></DialogTrigger>
             <DialogContent>
               <DialogHeader><DialogTitle>Register Master Data Asset</DialogTitle></DialogHeader>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
+              <DialogBody>
                 {fields.map(f => (
                   <div key={f.name} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>{f.label}</label>
@@ -108,8 +108,10 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
                     />
                   </div>
                 ))}
-                <DialogClose asChild><Button onClick={handleCreate} style={{ marginTop: '0.5rem' }}>Commit to Registry</Button></DialogClose>
-              </div>
+              </DialogBody>
+              <DialogFooter>
+                <DialogClose asChild><Button onClick={handleCreate}>Commit to Registry</Button></DialogClose>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
@@ -134,8 +136,8 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
       <Dialog open={updateDialogOpen} onOpenChange={setUpdateDialogOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Record</DialogTitle></DialogHeader>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
-            <p style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)', marginBottom: '-0.5rem' }}>Updating record for: <strong style={{color: 'var(--primary)'}}>{selectedItem?.name}</strong></p>
+          <DialogBody>
+            <p style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>Updating record for: <strong style={{color: 'var(--primary)'}}>{selectedItem?.name}</strong></p>
             {fields.map(f => (
               <div key={f.name} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>{f.label}</label>
@@ -147,8 +149,10 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
                 />
               </div>
             ))}
-            <Button onClick={handleUpdateRecord} style={{ marginTop: '0.5rem' }}>Save Updates</Button>
-          </div>
+          </DialogBody>
+          <DialogFooter>
+            <Button onClick={handleUpdateRecord}>Save Updates</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -156,8 +160,8 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
       <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Price History</DialogTitle></DialogHeader>
-          <div style={{ marginTop: '1.5rem', maxHeight: '400px', overflowY: 'auto' }}>
-            <p style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)', marginBottom: '1rem' }}>Historical pricing for: <strong style={{color: 'var(--primary)'}}>{historyItem?.name}</strong></p>
+          <DialogBody>
+            <p style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>Historical pricing for: <strong style={{color: 'var(--primary)'}}>{historyItem?.name}</strong></p>
             {historyItem?.priceHistory && historyItem.priceHistory.length > 0 ? (
               <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
                 <Table>
@@ -182,7 +186,7 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
                 No price history records found.
               </div>
             )}
-          </div>
+          </DialogBody>
         </DialogContent>
       </Dialog>
     </div>

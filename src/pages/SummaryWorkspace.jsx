@@ -310,6 +310,8 @@ export default function SummaryWorkspace() {
 function AddItemForm({ summary, onAdd, MasterDataSelector }) {
   const [selected, setSelected] = useState(null);
   const [qty, setQty] = useState('');
+  const [duration, setDuration] = useState('1');
+  const isLabor = summary.type === 'labor';
 
   return (
     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', backgroundColor: 'transparent', padding: '0.5rem 0 0 0', borderTop: '1px dashed var(--border)' }}>
@@ -321,8 +323,14 @@ function AddItemForm({ summary, onAdd, MasterDataSelector }) {
         <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)' }}>QTY</span>
         <Input type="number" placeholder="0" value={qty} onChange={e => setQty(e.target.value)} style={{ width: '80px', height: '2.5rem' }} />
       </div>
+      {isLabor && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)' }}>DURATION</span>
+          <Input type="number" placeholder="1" value={duration} onChange={e => setDuration(e.target.value)} style={{ width: '80px', height: '2.5rem' }} />
+        </div>
+      )}
       <div style={{ alignSelf: 'flex-end', paddingBottom: '2px' }}>
-        <Button size="md" onClick={() => { onAdd(selected, qty); setSelected(null); setQty(''); }} disabled={!selected || !qty}>
+        <Button size="md" onClick={() => { onAdd(selected, qty, duration); setSelected(null); setQty(''); setDuration('1'); }} disabled={!selected || !qty}>
           Add to Ledger
         </Button>
       </div>
@@ -336,15 +344,35 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
   const [toolsPercentage, setToolsPercentage] = React.useState(summary.toolsPercentage || 0);
   const [ocmPercentage, setOcmPercentage] = React.useState(summary.ocmPercentage || 0);
 
-  // Calculate material cost (sum of all non-excluded items)
-  const totalMaterialCost = groupItems
+  // Calculate costs based on summary type
+  const isLaborType = summary.type === 'labor';
+
+  // Calculate total from items (this is the "base cost" for calculations)
+  // For material type: this is the material cost
+  // For labor type: this is the labor cost (sum of Qty * Duration * Unit Price)
+  const totalBaseCost = groupItems
     .filter(i => !i.isExcluded)
     .reduce((sum, item) => sum + (item.totalCost || 0), 0);
 
-  // Calculate derived costs based on material cost
-  const totalLaborCost = totalMaterialCost * (laborPercentage / 100);
-  const totalToolsCost = totalMaterialCost * (toolsPercentage / 100);
-  const totalOcmCost = (totalMaterialCost + totalLaborCost + totalToolsCost) * (ocmPercentage / 100);
+  // For labor type: total labor cost is the base cost (from items)
+  // For material type: labor cost is a percentage of material cost
+  const totalLaborCost = isLaborType
+    ? totalBaseCost
+    : totalBaseCost * (laborPercentage / 100);
+
+  // Tools and Equipment cost is based on the base cost
+  // For material type: base cost = material cost
+  // For labor type: base cost = labor cost
+  const totalToolsCost = totalBaseCost * (toolsPercentage / 100);
+
+  // OCM cost is based on (base cost + labor cost + tools cost)
+  // For material: OCM = (material + labor + tools) * ocm%
+  // For labor: OCM = (labor + tools) * ocm% (labor is already the base)
+  const ocmBase = isLaborType
+    ? totalBaseCost + totalToolsCost  // For labor: base is labor cost, no separate labor cost to add
+    : totalBaseCost + totalLaborCost + totalToolsCost;  // For material: material + labor + tools
+
+  const totalOcmCost = ocmBase * (ocmPercentage / 100);
 
   const handlePercentageChange = async (type, value) => {
     const updates = { ...summary };
@@ -378,10 +406,13 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       <div ref={parentRef} style={{ maxHeight: '500px', overflow: 'auto', borderTop: '1px solid var(--border)' }}>
         <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
-          <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'var(--background)' }}>
+                <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'var(--background)' }}>
             <TableRow>
               <TableHead>Item Name</TableHead>
               <TableHead style={{ textAlign: 'center', width: '120px' }}>Qty</TableHead>
+              {isLaborType && (
+                <TableHead style={{ textAlign: 'center', width: '80px' }}>Duration</TableHead>
+              )}
               <TableHead style={{ textAlign: 'center', width: '80px' }}>Unit</TableHead>
               <TableHead style={{ textAlign: 'right' }}>Unit Price</TableHead>
               <TableHead style={{ textAlign: 'right' }}>Total Item Cost</TableHead>
@@ -400,8 +431,8 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
             {virtualRows.map((virtualRow) => {
               const item = groupItems[virtualRow.index];
               return (
-                <TableRow 
-                  key={item.id} 
+                <TableRow
+                  key={item.id}
                   ref={rowVirtualizer.measureElement}
                   data-index={virtualRow.index}
                   style={{ opacity: item.isExcluded ? 0.4 : 1, transition: 'opacity 0.2s' }}
@@ -411,20 +442,40 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
                     <div style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)' }}>PID: {item.id.substring(0, 8)}</div>
                   </TableCell>
                   <TableCell style={{ textAlign: 'center', fontWeight: 600 }}>
-                    <Input 
-                      type="number" 
-                      value={item.quantity} 
+                    <Input
+                      type="number"
+                      value={item.quantity}
                       onChange={async (e) => {
                         const newQty = Number(e.target.value);
                         if (newQty >= 0) {
-                          const newTotalCost = item.unitCostAtTimeOfAdding * newQty;
+                          const duration = item.duration || 1;
+                          const newTotalCost = isLaborType
+                            ? item.unitCostAtTimeOfAdding * newQty * duration
+                            : item.unitCostAtTimeOfAdding * newQty;
                           await updateSummaryItem({ ...item, quantity: newQty, totalCost: newTotalCost });
                           await cascadeCostUpdate(0, summary.id);
                         }
                       }}
-                      style={{ width: '80px', height: '2rem', textAlign: 'center', padding: '0 0.25rem', margin: '0 auto' }} 
+                      style={{ width: '80px', height: '2rem', textAlign: 'center', padding: '0 0.25rem', margin: '0 auto' }}
                     />
                   </TableCell>
+                  {isLaborType && (
+                    <TableCell style={{ textAlign: 'center', fontWeight: 600 }}>
+                      <Input
+                        type="number"
+                        value={item.duration || 1}
+                        onChange={async (e) => {
+                          const newDuration = Number(e.target.value);
+                          if (newDuration >= 0) {
+                            const newTotalCost = item.unitCostAtTimeOfAdding * item.quantity * newDuration;
+                            await updateSummaryItem({ ...item, duration: newDuration, totalCost: newTotalCost });
+                            await cascadeCostUpdate(0, summary.id);
+                          }
+                        }}
+                        style={{ width: '80px', height: '2rem', textAlign: 'center', padding: '0 0.25rem', margin: '0 auto' }}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
                      {item.unit || '-'}
                   </TableCell>
@@ -434,16 +485,16 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
                   </TableCell>
                   <TableCell style={{ textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center', height: '100%' }}>
                     <label title="Exclude this item" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={!!item.isExcluded} 
+                      <input
+                        type="checkbox"
+                        checked={!!item.isExcluded}
                         onChange={async () => {
                           await updateSummaryItem({ ...item, isExcluded: !item.isExcluded });
                           await cascadeCostUpdate(0, summary.id);
-                        }} 
+                        }}
                       />
                     </label>
-                    <button 
+                    <button
                       onClick={async () => {
                         await deleteSummaryItem(item.id);
                         await cascadeCostUpdate(0, summary.id);
@@ -472,20 +523,23 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
       
       {/* Footer Form row rendered normally below the virtualized table body */}
       <div style={{ borderTop: '1px solid var(--border)', padding: '1.25rem', backgroundColor: 'var(--background)' }}>
-        <AddItemForm 
-          summary={summary} 
-          onAdd={async (selectedMasterItem, qty) => {
+        <AddItemForm
+          summary={summary}
+          onAdd={async (selectedMasterItem, qty, durationInput) => {
             if (!selectedMasterItem || !qty) return;
             const unitCost = Number(selectedMasterItem.currentPrice || selectedMasterItem.currentRate || 0);
             const quantity = Number(qty);
             const additionalCost = unitCost * quantity;
-            
+
             const existingItem = groupItems.find(i => i.referenceId === selectedMasterItem.id && i.unitCostAtTimeOfAdding === unitCost);
-            
+
             if (existingItem) {
               const newQty = existingItem.quantity + quantity;
-              const newTotalCost = existingItem.unitCostAtTimeOfAdding * newQty;
-              
+              const duration = existingItem.duration || 1;
+              const newTotalCost = summary.type === 'labor'
+                ? existingItem.unitCostAtTimeOfAdding * newQty * duration
+                : existingItem.unitCostAtTimeOfAdding * newQty;
+
               await updateSummaryItem({
                 ...existingItem,
                 quantity: newQty,
@@ -493,7 +547,12 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
               });
               await cascadeCostUpdate(0, summary.id);
             } else {
-              const totalCost = unitCost * quantity;
+              const isLabor = summary.type === 'labor';
+              const duration = isLabor ? (Number(durationInput) || 1) : 1;
+              const totalCost = isLabor
+                ? unitCost * quantity * duration
+                : unitCost * quantity;
+
               const newItem = {
                 id: crypto.randomUUID(),
                 summaryId: summary.id,
@@ -501,31 +560,32 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
                 name: selectedMasterItem.name,
                 unit: selectedMasterItem.unit || '',
                 quantity,
+                ...(isLabor && { duration }),
                 unitCostAtTimeOfAdding: unitCost,
                 totalCost,
                 createdAt: new Date().toISOString()
               };
-              
+
               await createSummaryItem(newItem);
               await cascadeCostUpdate(0, summary.id);
             }
-          }} 
-          MasterDataSelector={MasterDataSelector} 
+          }}
+          MasterDataSelector={MasterDataSelector}
         />
       </div>
 
       {/* Cost Breakdown Section with Percentage Rates */}
-      {summary.type === 'material' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem', borderTop: '1px solid var(--border)', paddingTop: '1.25rem', paddingLeft: '1.25rem', paddingRight: '1.25rem', paddingBottom: '1.25rem', marginBottom: '0.5rem' }}>
-          {/* Labor Requisition */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem', borderTop: '1px solid var(--border)', paddingTop: '1.25rem', paddingLeft: '1.25rem', paddingRight: '1.25rem', paddingBottom: '1.25rem', marginBottom: '0.5rem' }}>
+        {/* Labor Requisition - only show for material type */}
+        {summary.type === 'material' && (
           <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', backgroundColor: '#fafafa' }}>
             <div style={{ marginBottom: '0.75rem' }}>
               <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', display: 'block', marginBottom: '0.5rem' }}>
                 LABOR REQUISITION
               </label>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Input 
-                  type="number" 
+                <Input
+                  type="number"
                   placeholder="0"
                   value={laborPercentage}
                   onChange={(e) => handlePercentageChange('labor', Number(e.target.value))}
@@ -541,58 +601,58 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
               </div>
             </div>
           </div>
+        )}
 
-          {/* Tools and Equipment */}
-          <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', backgroundColor: '#fafafa' }}>
-            <div style={{ marginBottom: '0.75rem' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', display: 'block', marginBottom: '0.5rem' }}>
-                TOOLS AND EQUIPMENT
-              </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Input 
-                  type="number" 
-                  placeholder="0"
-                  value={toolsPercentage}
-                  onChange={(e) => handlePercentageChange('tools', Number(e.target.value))}
-                  style={{ flex: 1, height: '2.25rem' }}
-                />
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>%</span>
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.25rem' }}>TOTAL TOOLS AND EQUIPMENT COST</div>
-              <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>
-                ₱{totalToolsCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              </div>
+        {/* Tools and Equipment */}
+        <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', backgroundColor: '#fafafa' }}>
+          <div style={{ marginBottom: '0.75rem' }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', display: 'block', marginBottom: '0.5rem' }}>
+              TOOLS AND EQUIPMENT
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Input
+                type="number"
+                placeholder="0"
+                value={toolsPercentage}
+                onChange={(e) => handlePercentageChange('tools', Number(e.target.value))}
+                style={{ flex: 1, height: '2.25rem' }}
+              />
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>%</span>
             </div>
           </div>
-
-          {/* OCM - Overhead, Contingencies and Miscellaneous */}
-          <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', backgroundColor: '#fafafa' }}>
-            <div style={{ marginBottom: '0.75rem' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', display: 'block', marginBottom: '0.5rem' }}>
-                OVERHEAD, CONTINGENCIES AND MISCELLANEOUS
-              </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Input 
-                  type="number" 
-                  placeholder="0"
-                  value={ocmPercentage}
-                  onChange={(e) => handlePercentageChange('ocm', Number(e.target.value))}
-                  style={{ flex: 1, height: '2.25rem' }}
-                />
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>%</span>
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.25rem' }}>TOTAL OCM COST</div>
-              <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>
-                ₱{totalOcmCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              </div>
+          <div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.25rem' }}>TOTAL TOOLS AND EQUIPMENT COST</div>
+            <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>
+              ₱{totalToolsCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </div>
           </div>
         </div>
-      )}
+
+        {/* OCM - Overhead, Contingencies and Miscellaneous */}
+        <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', backgroundColor: '#fafafa' }}>
+          <div style={{ marginBottom: '0.75rem' }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', display: 'block', marginBottom: '0.5rem' }}>
+              OVERHEAD, CONTINGENCIES AND MISCELLANEOUS
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Input
+                type="number"
+                placeholder="0"
+                value={ocmPercentage}
+                onChange={(e) => handlePercentageChange('ocm', Number(e.target.value))}
+                style={{ flex: 1, height: '2.25rem' }}
+              />
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>%</span>
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.25rem' }}>TOTAL OCM COST</div>
+            <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>
+              ₱{totalOcmCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

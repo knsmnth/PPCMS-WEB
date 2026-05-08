@@ -1,11 +1,11 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useCollection } from '../hooks/useData';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose, DialogBody, DialogFooter } from '../components/ui/dialog';
-import { Package, Plus, Trash2, Search, Info, Users, Wrench, History, Edit2 } from 'lucide-react';
+import { Package, Plus, Trash2, Search, Info, Users, Wrench, History, Edit2, ChevronDown } from 'lucide-react';
 
 function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
   const { data, createItem, updateItem, deleteItem } = useCollection(collectionName);
@@ -18,6 +18,15 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
 
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [historyItem, setHistoryItem] = useState(null);
+
+  const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
+
+  const handleSort = (key) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
 
   const handleCreate = async () => {
     const id = crypto.randomUUID();
@@ -68,11 +77,33 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
     setEditFormData({});
   };
 
-  const filteredData = data.filter(item => 
-    Object.values(item).some(val => 
-      String(val).toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  );
+  const processedData = useMemo(() => {
+    let result = data.filter(item => 
+      Object.values(item).some(val => 
+        String(val).toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    );
+
+    if (sortConfig.key) {
+      result.sort((a, b) => {
+        let aValue = a[sortConfig.key] || '';
+        let bValue = b[sortConfig.key] || '';
+
+        if (['currentPrice', 'currentRate'].includes(sortConfig.key)) {
+          aValue = Number(aValue);
+          bValue = Number(bValue);
+          if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+          if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+          return 0;
+        }
+
+        const cmp = aValue.toString().localeCompare(bValue.toString(), undefined, { numeric: true, sensitivity: 'base' });
+        return sortConfig.direction === 'asc' ? cmp : -cmp;
+      });
+    }
+
+    return result;
+  }, [data, searchTerm, sortConfig]);
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -119,7 +150,7 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
 
       <div style={{ borderRadius: 'var(--radius)', overflow: 'hidden' }}>
         <VirtualizedMasterDataTable 
-          filteredData={filteredData} 
+          filteredData={processedData} 
           fields={fields} 
           title={title} 
           Icon={Icon} 
@@ -128,7 +159,9 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
           setUpdateDialogOpen={setUpdateDialogOpen} 
           setHistoryItem={setHistoryItem} 
           setHistoryDialogOpen={setHistoryDialogOpen} 
-          deleteItem={deleteItem} 
+          deleteItem={deleteItem}
+          sortConfig={sortConfig}
+          handleSort={handleSort}
         />
       </div>
 
@@ -198,7 +231,8 @@ export function MaterialsDescriptionAndPrices() {
     { name: 'name', label: 'Asset Name' },
     { name: 'specs', label: 'Technical Specifications' },
     { name: 'unit', label: 'Item Code' },
-    { name: 'currentPrice', label: 'Current Base Price (₱)', type: 'number' }
+    { name: 'currentPrice', label: 'Current Base Price (₱)', type: 'number' },
+    { name: 'measurementUnit', label: 'Unit' }
   ]} />;
 }
 
@@ -210,7 +244,7 @@ export function LaborManager() {
   ]} />;
 }
 
-export function VirtualizedMasterDataTable({ filteredData, fields, title, Icon, setSelectedItem, setEditFormData, setUpdateDialogOpen, setHistoryItem, setHistoryDialogOpen, deleteItem }) {
+export function VirtualizedMasterDataTable({ filteredData, fields, title, Icon, setSelectedItem, setEditFormData, setUpdateDialogOpen, setHistoryItem, setHistoryDialogOpen, deleteItem, sortConfig, handleSort }) {
   const parentRef = React.useRef(null);
 
   const rowVirtualizer = useVirtualizer({
@@ -231,7 +265,20 @@ export function VirtualizedMasterDataTable({ filteredData, fields, title, Icon, 
       <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
         <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'var(--background)' }}>
           <TableRow>
-            {fields.map(f => <TableHead key={f.name}>{f.label}</TableHead>)}
+            {fields.map(f => (
+              <TableHead 
+                key={f.name}
+                onClick={() => handleSort(f.name)}
+                style={{ cursor: 'pointer', userSelect: 'none' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  {f.label}
+                  {sortConfig?.key === f.name && (
+                    <ChevronDown size={14} style={{ transform: sortConfig.direction === 'asc' ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', color: 'var(--primary)' }} />
+                  )}
+                </div>
+              </TableHead>
+            ))}
             <TableHead></TableHead>
           </TableRow>
         </TableHeader>

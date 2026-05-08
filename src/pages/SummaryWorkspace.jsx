@@ -116,7 +116,7 @@ export default function SummaryWorkspace() {
       <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '1rem', color: 'var(--muted-foreground)' }}>
         <Calculator size={48} style={{ opacity: 0.2 }} />
         <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)' }}>Context Required</h2>
-        <p>Please select a specific Program of Works to view its financial Summary Workspace.</p>
+        <p>Please select a specific Program of Works to view its financial Work Details.</p>
         <Button onClick={() => navigate('/schedules')} variant="outline" style={{ marginTop: '1rem' }}>
           Return to Program of Works
         </Button>
@@ -270,6 +270,7 @@ export default function SummaryWorkspace() {
               deleteSummaryItem={deleteSummaryItem} 
               createSummaryItem={createSummaryItem}
               updateSummaryItem={updateSummaryItem}
+              updateSummary={updateSummary}
               cascadeCostUpdate={cascadeCostUpdate}
               MasterDataSelector={MasterDataSelector}
             />
@@ -329,8 +330,36 @@ function AddItemForm({ summary, onAdd, MasterDataSelector }) {
   );
 }
 
-export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem, createSummaryItem, updateSummaryItem, cascadeCostUpdate, MasterDataSelector }) {
+export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem, createSummaryItem, updateSummaryItem, updateSummary, cascadeCostUpdate, MasterDataSelector }) {
   const parentRef = React.useRef(null);
+  const [laborPercentage, setLaborPercentage] = React.useState(summary.laborPercentage || 0);
+  const [toolsPercentage, setToolsPercentage] = React.useState(summary.toolsPercentage || 0);
+  const [ocmPercentage, setOcmPercentage] = React.useState(summary.ocmPercentage || 0);
+
+  // Calculate material cost (sum of all non-excluded items)
+  const totalMaterialCost = groupItems
+    .filter(i => !i.isExcluded)
+    .reduce((sum, item) => sum + (item.totalCost || 0), 0);
+
+  // Calculate derived costs based on material cost
+  const totalLaborCost = totalMaterialCost * (laborPercentage / 100);
+  const totalToolsCost = totalMaterialCost * (toolsPercentage / 100);
+  const totalOcmCost = (totalMaterialCost + totalLaborCost + totalToolsCost) * (ocmPercentage / 100);
+
+  const handlePercentageChange = async (type, value) => {
+    const updates = { ...summary };
+    if (type === 'labor') {
+      setLaborPercentage(value);
+      updates.laborPercentage = value;
+    } else if (type === 'tools') {
+      setToolsPercentage(value);
+      updates.toolsPercentage = value;
+    } else if (type === 'ocm') {
+      setOcmPercentage(value);
+      updates.ocmPercentage = value;
+    }
+    await updateSummary(updates);
+  };
 
   const rowVirtualizer = useVirtualizer({
     count: groupItems.length,
@@ -484,6 +513,86 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
           MasterDataSelector={MasterDataSelector} 
         />
       </div>
+
+      {/* Cost Breakdown Section with Percentage Rates */}
+      {summary.type === 'material' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem', borderTop: '1px solid var(--border)', paddingTop: '1.25rem', paddingLeft: '1.25rem', paddingRight: '1.25rem', paddingBottom: '1.25rem', marginBottom: '0.5rem' }}>
+          {/* Labor Requisition */}
+          <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', backgroundColor: '#fafafa' }}>
+            <div style={{ marginBottom: '0.75rem' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', display: 'block', marginBottom: '0.5rem' }}>
+                LABOR REQUISITION
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Input 
+                  type="number" 
+                  placeholder="0"
+                  value={laborPercentage}
+                  onChange={(e) => handlePercentageChange('labor', Number(e.target.value))}
+                  style={{ flex: 1, height: '2.25rem' }}
+                />
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>%</span>
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.25rem' }}>TOTAL LABOR COST</div>
+              <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>
+                ₱{totalLaborCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </div>
+            </div>
+          </div>
+
+          {/* Tools and Equipment */}
+          <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', backgroundColor: '#fafafa' }}>
+            <div style={{ marginBottom: '0.75rem' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', display: 'block', marginBottom: '0.5rem' }}>
+                TOOLS AND EQUIPMENT
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Input 
+                  type="number" 
+                  placeholder="0"
+                  value={toolsPercentage}
+                  onChange={(e) => handlePercentageChange('tools', Number(e.target.value))}
+                  style={{ flex: 1, height: '2.25rem' }}
+                />
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>%</span>
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.25rem' }}>TOTAL TOOLS AND EQUIPMENT COST</div>
+              <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>
+                ₱{totalToolsCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </div>
+            </div>
+          </div>
+
+          {/* OCM - Overhead, Contingencies and Miscellaneous */}
+          <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', backgroundColor: '#fafafa' }}>
+            <div style={{ marginBottom: '0.75rem' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', display: 'block', marginBottom: '0.5rem' }}>
+                OVERHEAD, CONTINGENCIES AND MISCELLANEOUS
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Input 
+                  type="number" 
+                  placeholder="0"
+                  value={ocmPercentage}
+                  onChange={(e) => handlePercentageChange('ocm', Number(e.target.value))}
+                  style={{ flex: 1, height: '2.25rem' }}
+                />
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>%</span>
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.25rem' }}>TOTAL OCM COST</div>
+              <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>
+                ₱{totalOcmCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

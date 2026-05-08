@@ -31,7 +31,7 @@ const dashboardItem = [
 const operationsItems = [
   { name: 'Projects', path: '/projects', icon: Folder, type: 'nav' },
   { name: 'Program of Works', path: '/schedules', icon: Calendar, type: 'dep' },
-  { name: 'Summary Workspace', path: '/summary', icon: Calculator, type: 'dep' },
+  { name: 'Work Details', path: '/summary', icon: Calculator, type: 'dep' },
 ];
 
 const locationItems = [

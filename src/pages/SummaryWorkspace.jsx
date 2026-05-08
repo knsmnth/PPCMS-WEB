@@ -411,9 +411,11 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
               <TableHead>Item Name</TableHead>
               <TableHead style={{ textAlign: 'center', width: '120px' }}>Qty</TableHead>
               {isLaborType && (
-                <TableHead style={{ textAlign: 'center', width: '80px' }}>Duration</TableHead>
+                <TableHead style={{ textAlign: 'center', width: '80px' }}>Duration (days)</TableHead>
               )}
-              <TableHead style={{ textAlign: 'center', width: '80px' }}>Unit</TableHead>
+              {!isLaborType && (
+                <TableHead style={{ textAlign: 'center', width: '80px' }}>Unit</TableHead>
+              )}
               <TableHead style={{ textAlign: 'right' }}>Unit Price</TableHead>
               <TableHead style={{ textAlign: 'right' }}>Total Item Cost</TableHead>
               <TableHead style={{ textAlign: 'right', width: '80px' }}>Exclude</TableHead>
@@ -422,7 +424,7 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
           <TableBody>
             {paddingTop > 0 && (
               <tr style={{ height: `${paddingTop}px`, border: 'none' }}>
-                <td colSpan={5} style={{ padding: 0, border: 0 }}>
+                <td colSpan={6} style={{ padding: 0, border: 0 }}>
                   <div style={{ height: `${paddingTop}px` }} />
                 </td>
               </tr>
@@ -476,9 +478,11 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
                       />
                     </TableCell>
                   )}
-                  <TableCell style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
-                     {item.unit || '-'}
-                  </TableCell>
+                  {!isLaborType && (
+                    <TableCell style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
+                      {item.unit || '-'}
+                    </TableCell>
+                  )}
                   <TableCell style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>₱{item.unitCostAtTimeOfAdding.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
                   <TableCell style={{ textAlign: 'right', fontWeight: 800, color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>
                      ₱{item.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -512,7 +516,7 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
             
             {paddingBottom > 0 && (
               <tr style={{ height: `${paddingBottom}px`, border: 'none' }}>
-                <td colSpan={5} style={{ padding: 0, border: 0 }}>
+                <td colSpan={6} style={{ padding: 0, border: 0 }}>
                   <div style={{ height: `${paddingBottom}px` }} />
                 </td>
               </tr>

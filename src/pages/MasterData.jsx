@@ -304,9 +304,9 @@ export function MaterialsDescriptionAndPrices() {
   return <MasterDataManager title="Materials Description and Prices" collectionName="materials" icon={Package} fields={[
     { name: 'name', label: 'Asset Name' },
     { name: 'specs', label: 'Technical Specifications' },
-    { name: 'unit', label: 'Item Code' },
-    { name: 'currentPrice', label: 'Current Base Price (₱)', type: 'number' },
-    { name: 'measurementUnit', label: 'Unit' }
+    { name: 'itemCode', label: 'Item Code' },
+    { name: 'unit', label: 'Unit' },
+    { name: 'currentPrice', label: 'Current Base Price (₱)', type: 'number' }
   ]} />;
 }
 

@@ -132,6 +132,71 @@ export async function removeFromSyncQueue(id) {
   return db.delete('syncQueue', id);
 }
 
+// ─── Data Migration Helpers ───────────────────────────────────────────────
+
+/**
+ * Migrates material records from old field structure to new structure.
+ * Old: unit = Item Code, measurementUnit = Unit
+ * New: itemCode = Item Code, unit = Unit
+ */
+export async function migrateMaterialUnits() {
+  const db = await initDB();
+  const materials = await db.getAll('materials');
+  let migratedCount = 0;
+
+  for (const material of materials) {
+    let needsUpdate = false;
+
+    // Migrate: old 'unit' field (was Item Code) → 'itemCode'
+    if (material.unit && !material.itemCode) {
+      material.itemCode = material.unit;
+      delete material.unit; // Remove old field
+      needsUpdate = true;
+    }
+
+    // Migrate: old 'measurementUnit' field → 'unit'
+    if (material.measurementUnit !== undefined) {
+      if (!material.unit) {
+        material.unit = material.measurementUnit;
+      }
+      delete material.measurementUnit; // Remove old field
+      needsUpdate = true;
+    }
+
+    // Ensure 'unit' field exists (might be a new field)
+    if (material.unit === undefined) {
+      material.unit = '';
+      needsUpdate = true;
+    }
+
+    if (needsUpdate) {
+      await db.put('materials', material);
+      migratedCount++;
+    }
+  }
+
+  return migratedCount;
+}
+
+/**
+ * Migrates labor records to add the 'unit' field if missing.
+ */
+export async function migrateLaborUnits() {
+  const db = await initDB();
+  const laborTypes = await db.getAll('laborTypes');
+  let migratedCount = 0;
+
+  for (const labor of laborTypes) {
+    if (labor.unit === undefined) {
+      labor.unit = ''; // Add empty unit field
+      await db.put('laborTypes', labor);
+      migratedCount++;
+    }
+  }
+
+  return migratedCount;
+}
+
 // ─── Bulk / Clear Helpers ────────────────────────────────────────────────────
 
 export async function clearStore(storeName) {

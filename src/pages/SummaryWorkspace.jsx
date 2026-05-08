@@ -45,26 +45,36 @@ export default function SummaryWorkspace() {
   const navigate = useNavigate();
   const [summaryName, setSummaryName] = useState('');
   const [summaryType, setSummaryType] = useState('material');
+  const [summaryUnit, setSummaryUnit] = useState('person/day');
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingSummary, setEditingSummary] = useState(null);
   const [editSummaryName, setEditSummaryName] = useState('');
   const [editSummaryType, setEditSummaryType] = useState('material');
+  const [editSummaryUnit, setEditSummaryUnit] = useState('person/day');
   
   const handleCreateSummary = async () => {
     if (!summaryName || !scheduleId) return;
     const id = crypto.randomUUID();
-    await createSummary({ id, scheduleOfWorkId: scheduleId, name: summaryName, type: summaryType, totalCost: 0 });
+    const unit = summaryType === 'labor' ? summaryUnit : '';
+    await createSummary({ id, scheduleOfWorkId: scheduleId, name: summaryName, type: summaryType, unit, totalCost: 0 });
     setSummaryName('');
+    setSummaryUnit('person/day');
   };
 
   const handleEditSummary = async () => {
     if (!editSummaryName || !editingSummary) return;
-    await updateSummary({
+    const updates = {
       ...editingSummary,
       name: editSummaryName,
       type: editSummaryType
-    });
+    };
+    if (editSummaryType === 'labor') {
+      updates.unit = editSummaryUnit;
+    } else {
+      updates.unit = '';
+    }
+    await updateSummary(updates);
     setEditDialogOpen(false);
     setEditingSummary(null);
   };
@@ -171,8 +181,8 @@ export default function SummaryWorkspace() {
             <DialogBody>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Group Classification</label>
-                <Select 
-                  value={summaryType} 
+                <Select
+                  value={summaryType}
                   onChange={(e) => setSummaryType(e.target.value)}
                 >
                   <option value="material">Material Assets</option>
@@ -183,6 +193,12 @@ export default function SummaryWorkspace() {
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Category Title</label>
                 <Input placeholder="e.g. Site Groundworks" value={summaryName} onChange={(e) => setSummaryName(e.target.value)} />
               </div>
+              {summaryType === 'labor' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Unit (e.g. person/day)</label>
+                  <Input placeholder="person/day" value={summaryUnit} onChange={(e) => setSummaryUnit(e.target.value)} />
+                </div>
+              )}
             </DialogBody>
             <DialogFooter>
               <DialogClose asChild><Button onClick={handleCreateSummary} disabled={!scheduleId}>Initialize Category</Button></DialogClose>
@@ -239,11 +255,12 @@ export default function SummaryWorkspace() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', borderLeft: '1px solid var(--border)', paddingLeft: '1rem' }}>
-                  <button 
+                  <button
                     onClick={() => {
                       setEditingSummary(summary);
                       setEditSummaryName(summary.name);
                       setEditSummaryType(summary.type);
+                      setEditSummaryUnit(summary.unit || 'person/day');
                       setEditDialogOpen(true);
                     }}
                     style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.2rem' }}
@@ -285,8 +302,8 @@ export default function SummaryWorkspace() {
           <DialogBody>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Group Classification</label>
-              <Select 
-                value={editSummaryType} 
+              <Select
+                value={editSummaryType}
                 onChange={(e) => setEditSummaryType(e.target.value)}
               >
                 <option value="material">Material Assets</option>
@@ -297,6 +314,12 @@ export default function SummaryWorkspace() {
               <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Category Title</label>
               <Input placeholder="e.g. Site Groundworks" value={editSummaryName} onChange={(e) => setEditSummaryName(e.target.value)} />
             </div>
+            {editSummaryType === 'labor' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Unit (e.g. person/day)</label>
+                <Input placeholder="person/day" value={editSummaryUnit} onChange={(e) => setEditSummaryUnit(e.target.value)} />
+              </div>
+            )}
           </DialogBody>
           <DialogFooter>
             <Button onClick={handleEditSummary}>Confirm Edits</Button>
@@ -311,6 +334,7 @@ function AddItemForm({ summary, onAdd, MasterDataSelector }) {
   const [selected, setSelected] = useState(null);
   const [qty, setQty] = useState('');
   const [duration, setDuration] = useState('1');
+  const [unit, setUnit] = useState('1');
   const isLabor = summary.type === 'labor';
 
   return (
@@ -329,8 +353,14 @@ function AddItemForm({ summary, onAdd, MasterDataSelector }) {
           <Input type="number" placeholder="1" value={duration} onChange={e => setDuration(e.target.value)} style={{ width: '80px', height: '2.5rem' }} />
         </div>
       )}
+      {isLabor && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)' }}>UNIT (persons/day)</span>
+          <Input type="number" placeholder="1" value={unit} onChange={e => setUnit(e.target.value)} style={{ width: '80px', height: '2.5rem' }} />
+        </div>
+      )}
       <div style={{ alignSelf: 'flex-end', paddingBottom: '2px' }}>
-        <Button size="md" onClick={() => { onAdd(selected, qty, duration); setSelected(null); setQty(''); setDuration('1'); }} disabled={!selected || !qty}>
+        <Button size="md" onClick={() => { onAdd(selected, qty, duration, unit); setSelected(null); setQty(''); setDuration('1'); setUnit('1'); }} disabled={!selected || !qty}>
           Add to Ledger
         </Button>
       </div>
@@ -413,9 +443,7 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
               {isLaborType && (
                 <TableHead style={{ textAlign: 'center', width: '80px' }}>Duration (days)</TableHead>
               )}
-              {!isLaborType && (
-                <TableHead style={{ textAlign: 'center', width: '80px' }}>Unit</TableHead>
-              )}
+              <TableHead style={{ textAlign: 'center', width: '80px' }}>Unit</TableHead>
               <TableHead style={{ textAlign: 'right' }}>Unit Price</TableHead>
               <TableHead style={{ textAlign: 'right' }}>Total Item Cost</TableHead>
               <TableHead style={{ textAlign: 'right', width: '80px' }}>Exclude</TableHead>
@@ -424,7 +452,7 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
           <TableBody>
             {paddingTop > 0 && (
               <tr style={{ height: `${paddingTop}px`, border: 'none' }}>
-                <td colSpan={6} style={{ padding: 0, border: 0 }}>
+                <td colSpan={isLaborType ? 7 : 6} style={{ padding: 0, border: 0 }}>
                   <div style={{ height: `${paddingTop}px` }} />
                 </td>
               </tr>
@@ -451,8 +479,9 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
                         const newQty = Number(e.target.value);
                         if (newQty >= 0) {
                           const duration = item.duration || 1;
+                          const unit = isLaborType ? (item.unit || 1) : 1;
                           const newTotalCost = isLaborType
-                            ? item.unitCostAtTimeOfAdding * newQty * duration
+                            ? item.unitCostAtTimeOfAdding * unit * duration * newQty
                             : item.unitCostAtTimeOfAdding * newQty;
                           await updateSummaryItem({ ...item, quantity: newQty, totalCost: newTotalCost });
                           await cascadeCostUpdate(0, summary.id);
@@ -469,7 +498,8 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
                         onChange={async (e) => {
                           const newDuration = Number(e.target.value);
                           if (newDuration >= 0) {
-                            const newTotalCost = item.unitCostAtTimeOfAdding * item.quantity * newDuration;
+                            const unit = item.unit || 1;
+                            const newTotalCost = item.unitCostAtTimeOfAdding * unit * newDuration * item.quantity;
                             await updateSummaryItem({ ...item, duration: newDuration, totalCost: newTotalCost });
                             await cascadeCostUpdate(0, summary.id);
                           }
@@ -478,11 +508,26 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
                       />
                     </TableCell>
                   )}
-                  {!isLaborType && (
-                    <TableCell style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
-                      {item.unit || '-'}
-                    </TableCell>
-                  )}
+                  <TableCell style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
+                    {isLaborType ? (
+                      <Input
+                        type="number"
+                        value={item.unit || 1}
+                        onChange={async (e) => {
+                          const newUnit = Number(e.target.value);
+                          if (newUnit >= 0) {
+                            const duration = item.duration || 1;
+                            const newTotalCost = item.unitCostAtTimeOfAdding * newUnit * duration;
+                            await updateSummaryItem({ ...item, unit: newUnit, totalCost: newTotalCost });
+                            await cascadeCostUpdate(0, summary.id);
+                          }
+                        }}
+                        style={{ width: '80px', height: '2rem', textAlign: 'center', padding: '0 0.25rem', margin: '0 auto', fontSize: '0.8rem' }}
+                      />
+                    ) : (
+                      item.unit || '-'
+                    )}
+                  </TableCell>
                   <TableCell style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>₱{item.unitCostAtTimeOfAdding.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
                   <TableCell style={{ textAlign: 'right', fontWeight: 800, color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>
                      ₱{item.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -516,7 +561,7 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
             
             {paddingBottom > 0 && (
               <tr style={{ height: `${paddingBottom}px`, border: 'none' }}>
-                <td colSpan={6} style={{ padding: 0, border: 0 }}>
+                <td colSpan={isLaborType ? 7 : 6} style={{ padding: 0, border: 0 }}>
                   <div style={{ height: `${paddingBottom}px` }} />
                 </td>
               </tr>
@@ -529,7 +574,7 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
       <div style={{ borderTop: '1px solid var(--border)', padding: '1.25rem', backgroundColor: 'var(--background)' }}>
         <AddItemForm
           summary={summary}
-          onAdd={async (selectedMasterItem, qty, durationInput) => {
+          onAdd={async (selectedMasterItem, qty, durationInput, unitInput) => {
             if (!selectedMasterItem || !qty) return;
             const unitCost = Number(selectedMasterItem.currentPrice || selectedMasterItem.currentRate || 0);
             const quantity = Number(qty);
@@ -540,8 +585,9 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
             if (existingItem) {
               const newQty = existingItem.quantity + quantity;
               const duration = existingItem.duration || 1;
+              const unit = summary.type === 'labor' ? (existingItem.unit || 1) : 1;
               const newTotalCost = summary.type === 'labor'
-                ? existingItem.unitCostAtTimeOfAdding * newQty * duration
+                ? existingItem.unitCostAtTimeOfAdding * unit * duration * newQty
                 : existingItem.unitCostAtTimeOfAdding * newQty;
 
               await updateSummaryItem({
@@ -553,8 +599,9 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
             } else {
               const isLabor = summary.type === 'labor';
               const duration = isLabor ? (Number(durationInput) || 1) : 1;
+              const unit = isLabor ? (Number(unitInput) || 1) : 1;
               const totalCost = isLabor
-                ? unitCost * quantity * duration
+                ? unitCost * unit * duration * quantity
                 : unitCost * quantity;
 
               const newItem = {
@@ -562,7 +609,7 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
                 summaryId: summary.id,
                 referenceId: selectedMasterItem.id,
                 name: selectedMasterItem.name,
-                unit: selectedMasterItem.unit || '',
+                unit: isLabor ? unit : (selectedMasterItem.unit || ''),
                 quantity,
                 ...(isLabor && { duration }),
                 unitCostAtTimeOfAdding: unitCost,

@@ -141,7 +141,7 @@ export default function Campuses() {
               <TableHead>Campus Information</TableHead>
               <TableHead>Location</TableHead>
               <TableHead style={{ textAlign: 'right' }}>Total Cost Baseline</TableHead>
-              <TableHead></TableHead>
+              <TableHead style={{ width: 80 }}></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -165,7 +165,13 @@ export default function Campuses() {
             {virtualRows.map((virtualRow) => {
               const c = filteredData[virtualRow.index];
               return (
-              <TableRow key={c.id} ref={rowVirtualizer.measureElement} data-index={virtualRow.index} style={{ opacity: c.isExcluded ? 0.6 : 1 }}>
+              <TableRow
+                key={c.id}
+                ref={rowVirtualizer.measureElement}
+                data-index={virtualRow.index}
+                style={{ opacity: c.isExcluded ? 0.6 : 1, cursor: 'pointer' }}
+                onClick={() => navigate(`/facilities?campusId=${c.id}`)}
+              >
                 <TableCell style={{ padding: '0.75rem 0.5rem', width: 40, textAlign: 'center' }}>
                   <input
                     type="checkbox"
@@ -190,12 +196,9 @@ export default function Campuses() {
                   ₱{(c.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </TableCell>
                 <TableCell style={{ textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center' }}>
-                  <Button variant="ghost" size="sm" onClick={() => navigate(`/facilities?campusId=${c.id}`)}>
-                    View Facilities
-                    <ArrowRight size={14} />
-                  </Button>
-                  <button 
-                    onClick={() => {
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setEditingCampus(c);
                       setEditName(c.name);
                       setEditLocation(c.location || '');
@@ -206,8 +209,11 @@ export default function Campuses() {
                   >
                     <Edit2 size={16} />
                   </button>
-                  <button 
-                    onClick={() => handleDelete(c.id)}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(c.id);
+                    }}
                     style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.5rem' }}
                     onMouseOver={(e) => e.currentTarget.style.color = 'var(--destructive)'}
                     onMouseOut={(e) => e.currentTarget.style.color = '#a1a1aa'}

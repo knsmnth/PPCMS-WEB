@@ -172,6 +172,77 @@ export async function parseProjectsExcel(file) {
   return rows;
 }
 
+// ─── Master Data Export / Import (Generic) ────────────────────────────────────
+
+export async function exportMasterDataTemplate(title, fields, data = []) {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'PPOMS';
+  workbook.created = new Date();
+
+  // Create sanitized sheet name (max 31 chars for excel)
+  const sheetName = title.substring(0, 31).replace(/[\[\]*?:\/\\]/g, "");
+  const sheet = workbook.addWorksheet(sheetName);
+
+  const columns = [
+    { header: 'ID (Leave blank for new)', key: 'id', width: 35 }
+  ];
+
+  fields.forEach(f => {
+    columns.push({ header: f.label, key: f.name, width: 30 });
+  });
+
+  sheet.columns = columns;
+
+  const headerRow = sheet.getRow(1);
+  headerRow.font = { bold: true, color: { argb: COLORS.headerFont } };
+  headerRow.fill = HEADER_FILL;
+  headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+  headerRow.height = 22;
+
+  data.forEach(item => {
+    const rowData = { id: item.id };
+    fields.forEach(f => {
+      rowData[f.name] = item[f.name];
+    });
+    sheet.addRow(rowData);
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  saveAs(new Blob([buffer]), toExcelFilename(slugifyFilename(title)));
+}
+
+export async function parseMasterDataExcel(file, title, fields) {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(file);
+  const sheetName = title.substring(0, 31).replace(/[\[\]*?:\/\\]/g, "");
+  const sheet = workbook.getWorksheet(sheetName) || workbook.worksheets[0]; // fallback to first sheet
+  if (!sheet) throw new Error(`Could not find sheet ${sheetName}`);
+
+  const rows = [];
+  sheet.eachRow((row, rowNumber) => {
+    if (rowNumber > 1) {
+      const v = row.values;
+      const rowObj = {
+        id: v[1]?.toString() || null,
+      };
+      
+      fields.forEach((f, idx) => {
+        let val = v[idx + 2];
+        if (val !== undefined && val !== null) {
+          if (f.type === 'number') {
+            val = Number(val);
+          } else {
+            val = val.toString();
+          }
+        }
+        rowObj[f.name] = val;
+      });
+      rows.push(rowObj);
+    }
+  });
+  return rows;
+}
+
 // ─── Schedules Export / Import ────────────────────────────────────────────────
 
 /**

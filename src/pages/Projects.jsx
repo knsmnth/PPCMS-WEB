@@ -343,12 +343,12 @@ export default function Projects() {
 
   const getStatusColor = (currentStatus) => {
     switch (currentStatus?.toLowerCase()) {
-      case 'accepted': return { bg: '#10b981', text: '#ffffff' };
+      case 'accepted': return { bg: '#3f3f46', text: '#ffffff' }; // Dark Grey
       case 'planning phase': return { bg: '#f59e0b', text: '#ffffff' };
       case 'on-going': return { bg: '#1e3a8a', text: '#ffffff' }; // Dark Blue from mockup
       case 'on review': return { bg: '#8b5cf6', text: '#ffffff' };
       case 'for submission': return { bg: '#6366f1', text: '#ffffff' };
-      case 'closed': return { bg: '#3f3f46', text: '#ffffff' };
+      case 'closed': return { bg: '#10b981', text: '#ffffff' }; // Green
       default: return { bg: '#166534', text: '#ffffff' }; // Dark Green default
     }
   };
@@ -442,10 +442,10 @@ export default function Projects() {
                   <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
                     <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Priority</label>
                     <Select value={priority} onChange={(e) => setPriority(e.target.value)}>
-                      <option value="Low">Low - Light Blue</option>
-                      <option value="Medium">Medium - Green</option>
-                      <option value="High">High - Yellow</option>
-                      <option value="Very High">Very High - Red</option>
+                      <option value="Low">Low</option>
+                      <option value="Medium">Medium</option>
+                      <option value="High">High</option>
+                      <option value="Very High">Very High</option>
                     </Select>
                   </div>
                   <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
@@ -709,10 +709,10 @@ export default function Projects() {
               <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Priority</label>
                 <Select value={editPriority} onChange={(e) => setEditPriority(e.target.value)}>
-                  <option value="Low">Low - Light Blue</option>
-                  <option value="Medium">Medium - Green</option>
-                  <option value="High">High - Yellow</option>
-                  <option value="Very High">Very High - Red</option>
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                  <option value="Very High">Very High</option>
                 </Select>
               </div>
               <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '0.5rem' }}>

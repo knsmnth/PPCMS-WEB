@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useCollection } from '../hooks/useData';
@@ -242,8 +242,7 @@ export default function SummaryWorkspace() {
                       checked={!!summary.isExcluded} 
                       onChange={async () => {
                         await updateSummary({ ...summary, isExcluded: !summary.isExcluded });
-                        await cascadeCostUpdate(0, summary.id);
-                      }} 
+                      }}
                     />
                     EXCLUDE GROUP
                   </label>
@@ -288,7 +287,6 @@ export default function SummaryWorkspace() {
               createSummaryItem={createSummaryItem}
               updateSummaryItem={updateSummaryItem}
               updateSummary={updateSummary}
-              cascadeCostUpdate={cascadeCostUpdate}
               MasterDataSelector={MasterDataSelector}
             />
           </div>
@@ -368,11 +366,11 @@ function AddItemForm({ summary, onAdd, MasterDataSelector }) {
   );
 }
 
-export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem, createSummaryItem, updateSummaryItem, updateSummary, cascadeCostUpdate, MasterDataSelector }) {
-  const parentRef = React.useRef(null);
-  const [laborPercentage, setLaborPercentage] = React.useState(summary.laborPercentage || 0);
-  const [toolsPercentage, setToolsPercentage] = React.useState(summary.toolsPercentage || 0);
-  const [ocmPercentage, setOcmPercentage] = React.useState(summary.ocmPercentage || 0);
+export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem, createSummaryItem, updateSummaryItem, updateSummary, MasterDataSelector }) {
+  const parentRef = useRef(null);
+  const [laborPercentage, setLaborPercentage] = useState(summary.laborPercentage || 0);
+  const [toolsPercentage, setToolsPercentage] = useState(summary.toolsPercentage || 0);
+  const [ocmPercentage, setOcmPercentage] = useState(summary.ocmPercentage || 0);
 
   // Calculate costs based on summary type
   const isLaborType = summary.type === 'labor';
@@ -403,6 +401,26 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
     : totalBaseCost + totalLaborCost + totalToolsCost;  // For material: material + labor + tools
 
   const totalOcmCost = ocmBase * (ocmPercentage / 100);
+
+  const groupTotalCost = useMemo(() => {
+    if (isLaborType) {
+      // For labor type: total cost = labor (totalBaseCost) + tools + OCM
+      return totalBaseCost + totalToolsCost + totalOcmCost;
+    }
+    // For material type: total work cost = materials (totalBaseCost) + labor + tools + OCM
+    return totalBaseCost + totalLaborCost + totalToolsCost + totalOcmCost;
+  }, [isLaborType, totalBaseCost, totalLaborCost, totalToolsCost, totalOcmCost]);
+
+  // Sync summary.totalCost with groupTotalCost (sum of the 3 boxes)
+  const prevGroupTotalCost = useRef(groupTotalCost);
+  useEffect(() => {
+    if (prevGroupTotalCost.current !== groupTotalCost) {
+      prevGroupTotalCost.current = groupTotalCost;
+      if (summary.totalCost !== groupTotalCost) {
+        updateSummary({ ...summary, totalCost: groupTotalCost });
+      }
+    }
+  }, [groupTotalCost, summary.totalCost, updateSummary, summary]);
 
   const handlePercentageChange = async (type, value) => {
     const updates = { ...summary };
@@ -484,7 +502,6 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
                             ? item.unitCostAtTimeOfAdding * unit * duration * newQty
                             : item.unitCostAtTimeOfAdding * newQty;
                           await updateSummaryItem({ ...item, quantity: newQty, totalCost: newTotalCost });
-                          await cascadeCostUpdate(0, summary.id);
                         }
                       }}
                       style={{ width: '80px', height: '2rem', textAlign: 'center', padding: '0 0.25rem', margin: '0 auto' }}
@@ -501,7 +518,6 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
                             const unit = item.unit || 1;
                             const newTotalCost = item.unitCostAtTimeOfAdding * unit * newDuration * item.quantity;
                             await updateSummaryItem({ ...item, duration: newDuration, totalCost: newTotalCost });
-                            await cascadeCostUpdate(0, summary.id);
                           }
                         }}
                         style={{ width: '80px', height: '2rem', textAlign: 'center', padding: '0 0.25rem', margin: '0 auto' }}
@@ -519,7 +535,6 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
                             const duration = item.duration || 1;
                             const newTotalCost = item.unitCostAtTimeOfAdding * newUnit * duration;
                             await updateSummaryItem({ ...item, unit: newUnit, totalCost: newTotalCost });
-                            await cascadeCostUpdate(0, summary.id);
                           }
                         }}
                         style={{ width: '80px', height: '2rem', textAlign: 'center', padding: '0 0.25rem', margin: '0 auto', fontSize: '0.8rem' }}
@@ -539,14 +554,12 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
                         checked={!!item.isExcluded}
                         onChange={async () => {
                           await updateSummaryItem({ ...item, isExcluded: !item.isExcluded });
-                          await cascadeCostUpdate(0, summary.id);
                         }}
                       />
                     </label>
                     <button
                       onClick={async () => {
                         await deleteSummaryItem(item.id);
-                        await cascadeCostUpdate(0, summary.id);
                       }}
                       style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.5rem', transition: 'all 0.2s' }}
                       onMouseOver={(e) => e.currentTarget.style.color = 'var(--destructive)'}
@@ -578,7 +591,6 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
             if (!selectedMasterItem || !qty) return;
             const unitCost = Number(selectedMasterItem.currentPrice || selectedMasterItem.currentRate || 0);
             const quantity = Number(qty);
-            const additionalCost = unitCost * quantity;
 
             const existingItem = groupItems.find(i => i.referenceId === selectedMasterItem.id && i.unitCostAtTimeOfAdding === unitCost);
 
@@ -595,7 +607,6 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
                 quantity: newQty,
                 totalCost: newTotalCost
               });
-              await cascadeCostUpdate(0, summary.id);
             } else {
               const isLabor = summary.type === 'labor';
               const duration = isLabor ? (Number(durationInput) || 1) : 1;
@@ -618,7 +629,6 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
               };
 
               await createSummaryItem(newItem);
-              await cascadeCostUpdate(0, summary.id);
             }
           }}
           MasterDataSelector={MasterDataSelector}

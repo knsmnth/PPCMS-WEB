@@ -24,6 +24,9 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
   const fileInputRef = useRef(null);
 
   const handleSort = (key) => {
+    const field = fields.find(f => f.name === key);
+    if (field && field.sortable === false) return;
+    
     setSortConfig(prev => ({
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
@@ -303,10 +306,10 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
 export function MaterialsDescriptionAndPrices() {
   return <MasterDataManager title="Materials Description and Prices" collectionName="materials" icon={Package} fields={[
     { name: 'name', label: 'Asset Name' },
-    { name: 'specs', label: 'Technical Specifications' },
+    { name: 'specs', label: 'Technical Specifications', sortable: false },
     { name: 'itemCode', label: 'Item Code' },
-    { name: 'unit', label: 'Unit' },
-    { name: 'currentPrice', label: 'Current Base Price (₱)', type: 'number' }
+    { name: 'currentPrice', label: 'Current Base Price (₱)', type: 'number' },
+    { name: 'unit', label: 'Unit', sortable: false }
   ]} />;
 }
 
@@ -314,7 +317,7 @@ export function MaterialsDescriptionAndPrices() {
 export function LaborManager() {
   return <MasterDataManager title="Human Capital" collectionName="laborTypes" icon={Users} fields={[
     { name: 'name', label: 'Personnel Role' },
-    { name: 'currentRate', label: 'Standard Rate (₱)', type: 'number' }
+    { name: 'currentRate', label: 'Standard Rate (₱)', type: 'number', sortable: false }
   ]} />;
 }
 
@@ -339,26 +342,31 @@ export function VirtualizedMasterDataTable({ filteredData, fields, title, Icon, 
       <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
         <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'var(--background)' }}>
           <TableRow>
-            {fields.map(f => (
-              <TableHead 
-                key={f.name}
-                onClick={() => handleSort(f.name)}
-                style={{ cursor: 'pointer', userSelect: 'none' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                  {f.label}
-                  <ChevronDown 
-                    size={14} 
-                    style={{ 
-                      transform: sortConfig?.key === f.name && sortConfig.direction === 'asc' ? 'rotate(180deg)' : 'none', 
-                      transition: 'transform 0.2s, opacity 0.2s', 
-                      color: sortConfig?.key === f.name ? 'var(--primary)' : 'var(--muted-foreground)',
-                      opacity: sortConfig?.key === f.name ? 1 : 0.3
-                    }} 
-                  />
-                </div>
-              </TableHead>
-            ))}
+            {fields.map(f => {
+              const isSortable = f.sortable !== false;
+              return (
+                <TableHead 
+                  key={f.name}
+                  onClick={() => isSortable && handleSort(f.name)}
+                  style={{ cursor: isSortable ? 'pointer' : 'default', userSelect: 'none' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    {f.label}
+                    {isSortable && (
+                      <ChevronDown 
+                        size={14} 
+                        style={{ 
+                          transform: sortConfig?.key === f.name && sortConfig.direction === 'asc' ? 'rotate(180deg)' : 'none', 
+                          transition: 'transform 0.2s, opacity 0.2s', 
+                          color: sortConfig?.key === f.name ? '#000000' : '#888888',
+                          opacity: sortConfig?.key === f.name ? 1 : 0.4
+                        }} 
+                      />
+                    )}
+                  </div>
+                </TableHead>
+              );
+            })}
             <TableHead></TableHead>
           </TableRow>
         </TableHeader>

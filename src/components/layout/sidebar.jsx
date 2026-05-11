@@ -216,17 +216,19 @@ export function Sidebar({ className }) {
 
         {/*
           ── Floating circle toggle ──
-          Lives OUTSIDE the aside so overflow:hidden won't clip it.
-          Positioned at the sidebar's right edge, vertically centered in the header.
+          Uses sticky positioning to stay fixed while scrolling.
+          Wrapped in a container that spans the sidebar height.
         */}
-        <button
-          className={styles.toggleBtn}
-          onClick={toggle}
-          title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          {isCollapsed ? <ChevronRight size={13} strokeWidth={2.5} /> : <ChevronLeft size={13} strokeWidth={2.5} />}
-        </button>
+        <div className={styles.toggleWrapper}>
+          <button
+            className={styles.toggleBtn}
+            onClick={toggle}
+            title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {isCollapsed ? <ChevronRight size={13} strokeWidth={2.5} /> : <ChevronLeft size={13} strokeWidth={2.5} />}
+          </button>
+        </div>
 
       </div>
     </SidebarContext.Provider>

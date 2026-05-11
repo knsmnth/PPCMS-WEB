@@ -946,7 +946,13 @@ export default function ProgramOfWorks() {
         <div>
           <button
             id="btn-back-projects"
-            onClick={() => navigate(`/projects${project ? `?facilityId=${project.facilityId}` : ''}`)}
+            onClick={() => {
+              if (window.history.state && window.history.state.idx > 0) {
+                navigate(-1);
+              } else {
+                navigate('/projects');
+              }
+            }}
             style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.8rem', cursor: 'pointer', marginBottom: '0.5rem', fontWeight: 600 }}
           >
             <ArrowLeft size={14} /> Back to Projects

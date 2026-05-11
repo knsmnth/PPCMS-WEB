@@ -128,6 +128,10 @@ export default function SummaryWorkspace() {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
+  const runningTotal = useMemo(() => {
+    return summaries.reduce((sum, s) => sum + (s.totalCost || 0), 0);
+  }, [summaries]);
+
   if (!scheduleId) {
     return (
       <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '1rem', color: 'var(--muted-foreground)' }}>
@@ -176,14 +180,23 @@ export default function SummaryWorkspace() {
           </div>
         </div>
         
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus size={18} />
-              Add New Work
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Running Total Work Cost
+            </div>
+            <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--primary)', letterSpacing: '-0.02em' }}>
+              ₱{runningTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </div>
+          </div>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus size={18} />
+                Add New Work
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
             <DialogHeader><DialogTitle>Categorize New Work</DialogTitle></DialogHeader>
             <DialogBody>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -212,6 +225,7 @@ export default function SummaryWorkspace() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </header>
 
       {summaries.length === 0 && (
@@ -256,7 +270,20 @@ export default function SummaryWorkspace() {
                       type="checkbox" 
                       checked={!!summary.isExcluded} 
                       onChange={async () => {
-                        await updateSummary({ ...summary, isExcluded: !summary.isExcluded });
+                        const newExcludedState = !summary.isExcluded;
+                        await updateSummary({ 
+                          ...summary, 
+                          isExcluded: newExcludedState,
+                          excludeLabor: newExcludedState,
+                          excludeTools: newExcludedState,
+                          excludeOcm: newExcludedState
+                        });
+                        await Promise.all(groupItems.map(item => {
+                          if (!!item.isExcluded !== newExcludedState) {
+                            return updateSummaryItem({ ...item, isExcluded: newExcludedState });
+                          }
+                          return Promise.resolve();
+                        }));
                       }}
                     />
                     EXCLUDE GROUP

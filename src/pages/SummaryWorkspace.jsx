@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose, DialogBody, DialogFooter } from '../components/ui/dialog';
-import { cascadeCostUpdate } from '../lib/billing';
+import { cascadeCostUpdate, recomputeScheduleCost } from '../lib/billing';
 import { cascadeDelete } from '../lib/cascade';
 import { SelectCombo } from '../components/ui/select-combo';
 import { Select } from '../components/ui/select';
@@ -57,7 +57,17 @@ export default function SummaryWorkspace() {
     if (!summaryName || !scheduleId) return;
     const id = crypto.randomUUID();
     const unit = summaryType === 'labor' ? summaryUnit : '';
-    await createSummary({ id, scheduleOfWorkId: scheduleId, name: summaryName, type: summaryType, unit, totalCost: 0 });
+    await createSummary({ 
+      id, 
+      scheduleOfWorkId: scheduleId, 
+      name: summaryName, 
+      type: summaryType, 
+      unit, 
+      totalCost: 0,
+      laborPercentage: projectContext?.defaultLaborPercentage || 0,
+      toolsPercentage: projectContext?.defaultToolsPercentage || 0,
+      ocmPercentage: projectContext?.defaultOcmPercentage || 0,
+    });
     setSummaryName('');
     setSummaryUnit('person/day');
   };
@@ -81,9 +91,6 @@ export default function SummaryWorkspace() {
 
   const handleDeleteSummary = async (summary) => {
     if (confirm(`Are you sure you want to delete the "${summary.name}" cost group? All underlying items will be deleted.`)) {
-      if (summary.totalCost > 0) {
-        await cascadeCostUpdate(-summary.totalCost, summary.id);
-      }
       await cascadeDelete('summary', summary.id);
       refreshSummaries();
     }
@@ -255,15 +262,42 @@ export default function SummaryWorkspace() {
                     EXCLUDE GROUP
                   </label>
                 </div>
-                <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.1rem' }}>
-                    {summary.type === 'labor' ? 'TOTAL LABOR COST' : 'TOTAL MATERIAL COST'}
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', textAlign: 'right' }}>
+                  <div>
+                    <div style={{ fontSize: '0.70rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.1rem', textTransform: 'uppercase' }}>
+                      {summary.type === 'labor' ? 'BASE LABOR COST' : 'BASE MATERIAL COST'}
+                    </div>
+                    <div style={{ fontWeight: 700, fontSize: '1.2rem', color: 'var(--foreground)', letterSpacing: '-0.02em' }}>
+                      ₱{totalBaseCostObj.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </div>
                   </div>
-                  <div style={{ fontWeight: 800, fontSize: '1.4rem', color: 'var(--primary)', letterSpacing: '-0.03em' }}>
-                    ₱{totalBaseCostObj.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+
+                  {(summary.totalCost !== undefined && (summary.totalCost || 0) > totalBaseCostObj) && (
+                    <>
+                      <div style={{ fontSize: '1.2rem', color: 'var(--muted-foreground)' }}>+</div>
+                      <div>
+                        <div style={{ fontSize: '0.70rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.1rem', textTransform: 'uppercase' }}>
+                          INDIRECT COSTS
+                        </div>
+                        <div style={{ fontWeight: 700, fontSize: '1.2rem', color: 'var(--foreground)', letterSpacing: '-0.02em' }}>
+                          ₱{((summary.totalCost || 0) - totalBaseCostObj).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  <div style={{ paddingLeft: '1.5rem', borderLeft: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--primary)', marginBottom: '0.1rem', textTransform: 'uppercase' }}>
+                      GRAND TOTAL
+                    </div>
+                    <div style={{ fontWeight: 900, fontSize: '1.5rem', color: 'var(--primary)', letterSpacing: '-0.03em' }}>
+                      ₱{(summary.totalCost || totalBaseCostObj).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </div>
                   </div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', borderLeft: '1px solid var(--border)', paddingLeft: '1rem' }}>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', borderLeft: '1px solid var(--border)', paddingLeft: '1.5rem' }}>
                   <button
                     onClick={() => {
                       setEditingSummary(summary);
@@ -297,8 +331,7 @@ export default function SummaryWorkspace() {
               createSummaryItem={createSummaryItem}
               updateSummaryItem={updateSummaryItem}
               updateSummary={updateSummary}
-              MasterDataSelector={MasterDataSelector}
-            />
+              MasterDataSelector={MasterDataSelector}              projectContext={projectContext}            />
           </div>
         );
       })}
@@ -376,7 +409,7 @@ function AddItemForm({ summary, onAdd, MasterDataSelector }) {
   );
 }
 
-export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem, createSummaryItem, updateSummaryItem, updateSummary, MasterDataSelector }) {
+export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem, createSummaryItem, updateSummaryItem, updateSummary, MasterDataSelector, projectContext }) {
   const parentRef = useRef(null);
   const [laborPercentage, setLaborPercentage] = useState(summary.laborPercentage || 0);
   const [toolsPercentage, setToolsPercentage] = useState(summary.toolsPercentage || 0);
@@ -399,20 +432,20 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
     .reduce((sum, item) => sum + (item.totalCost || 0), 0);
 
   // For labor type: total labor cost is the base cost (from items)
-  // For material type: labor cost is a percentage of material cost (if shown)
+  // For material type: labor cost is a percentage of material cost (if shown and not excluded)
   const totalLaborCost = isLaborType
     ? totalBaseCost
-    : (showLabor ? totalBaseCost * (laborPercentage / 100) : 0);
+    : (showLabor && !summary.excludeLabor ? totalBaseCost * (laborPercentage / 100) : 0);
 
-  // Tools and Equipment cost is based on the base cost (if shown)
-  const totalToolsCost = showTools ? (totalBaseCost * (toolsPercentage / 100)) : 0;
+  // Tools and Equipment cost is based on the base cost (if shown and not excluded)
+  const totalToolsCost = (showTools && !summary.excludeTools) ? (totalBaseCost * (toolsPercentage / 100)) : 0;
 
-  // OCM cost is based on (base cost + labor cost + tools cost) (if shown)
+  // OCM cost is based on (base cost + labor cost + tools cost) (if shown and not excluded)
   const ocmBase = isLaborType
     ? totalBaseCost + totalToolsCost
     : totalBaseCost + totalLaborCost + totalToolsCost;
 
-  const totalOcmCost = showOcm ? (ocmBase * (ocmPercentage / 100)) : 0;
+  const totalOcmCost = (showOcm && !summary.excludeOcm) ? (ocmBase * (ocmPercentage / 100)) : 0;
 
   const groupTotalCost = useMemo(() => {
     if (isLaborType) {
@@ -429,7 +462,11 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
     if (prevGroupTotalCost.current !== groupTotalCost) {
       prevGroupTotalCost.current = groupTotalCost;
       if (summary.totalCost !== groupTotalCost) {
-        updateSummary({ ...summary, totalCost: groupTotalCost });
+        updateSummary({ ...summary, totalCost: groupTotalCost }).then(() => {
+          if (summary.scheduleOfWorkId) {
+            recomputeScheduleCost(summary.scheduleOfWorkId);
+          }
+        });
       }
     }
   }, [groupTotalCost, summary.totalCost, updateSummary, summary]);
@@ -437,21 +474,44 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
   const handleToggleContainer = async (type) => {
     const updates = { ...summary };
     if (type === 'labor') {
-      const newVal = !showLabor;
+      const newVal = !showLaborState;
       setShowLaborState(newVal);
       updates.showLabor = newVal;
       if (!newVal) { setLaborPercentage(0); updates.laborPercentage = 0; }
+      else {
+        const globalVal = projectContext?.defaultLaborPercentage || 0;
+        setLaborPercentage(globalVal);
+        updates.laborPercentage = globalVal;
+      }
     } else if (type === 'tools') {
       const newVal = !showTools;
       setShowTools(newVal);
       updates.showTools = newVal;
       if (!newVal) { setToolsPercentage(0); updates.toolsPercentage = 0; }
+      else {
+        const globalVal = projectContext?.defaultToolsPercentage || 0;
+        setToolsPercentage(globalVal);
+        updates.toolsPercentage = globalVal;
+      }
     } else if (type === 'ocm') {
       const newVal = !showOcm;
       setShowOcm(newVal);
       updates.showOcm = newVal;
       if (!newVal) { setOcmPercentage(0); updates.ocmPercentage = 0; }
+      else {
+        const globalVal = projectContext?.defaultOcmPercentage || 0;
+        setOcmPercentage(globalVal);
+        updates.ocmPercentage = globalVal;
+      }
     }
+    await updateSummary(updates);
+  };
+
+  const handleToggleExcludeContainer = async (type) => {
+    const updates = { ...summary };
+    if (type === 'labor') updates.excludeLabor = !summary.excludeLabor;
+    else if (type === 'tools') updates.excludeTools = !summary.excludeTools;
+    else if (type === 'ocm') updates.excludeOcm = !summary.excludeOcm;
     await updateSummary(updates);
   };
 
@@ -675,20 +735,32 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem', borderTop: '1px solid var(--border)', paddingTop: '1.25rem', paddingLeft: '1.25rem', paddingRight: '1.25rem', paddingBottom: '1.25rem', marginBottom: '0.5rem' }}>
           {/* Labor Requisition - only show for material type */}
           {summary.type === 'material' && showLabor && (
-            <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', backgroundColor: '#fafafa', position: 'relative' }}>
-              <button 
-                onClick={() => handleToggleContainer('labor')}
-                style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.25rem' }}
-                onMouseOver={(e) => e.currentTarget.style.color = 'var(--destructive)'}
-                onMouseOut={(e) => e.currentTarget.style.color = '#a1a1aa'}
-                title="Remove Labor Requisition"
-              >
-                <Trash2 size={14} />
-              </button>
-              <div style={{ marginBottom: '0.75rem', paddingRight: '1.5rem' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', display: 'block', marginBottom: '0.5rem' }}>
+            <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', backgroundColor: '#fafafa', opacity: summary.excludeLabor ? 0.6 : 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--foreground)', textTransform: 'uppercase', textDecoration: summary.excludeLabor ? 'line-through' : 'none', margin: 0 }}>
                   LABOR REQUISITION
                 </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.65rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={!!summary.excludeLabor} 
+                      onChange={() => handleToggleExcludeContainer('labor')}
+                    />
+                    EXCLUDE
+                  </label>
+                  <button 
+                    onClick={() => handleToggleContainer('labor')}
+                    style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: 0, display: 'flex' }}
+                    onMouseOver={(e) => e.currentTarget.style.color = 'var(--destructive)'}
+                    onMouseOut={(e) => e.currentTarget.style.color = '#a1a1aa'}
+                    title="Remove Labor Requisition"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+              <div style={{ marginBottom: '0.75rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Input
                     type="number"
@@ -711,20 +783,32 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
 
           {/* Tools and Equipment */}
           {showTools && (
-            <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', backgroundColor: '#fafafa', position: 'relative' }}>
-              <button 
-                onClick={() => handleToggleContainer('tools')}
-                style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.25rem' }}
-                onMouseOver={(e) => e.currentTarget.style.color = 'var(--destructive)'}
-                onMouseOut={(e) => e.currentTarget.style.color = '#a1a1aa'}
-                title="Remove Tools and Equipment"
-              >
-                <Trash2 size={14} />
-              </button>
-              <div style={{ marginBottom: '0.75rem', paddingRight: '1.5rem' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', display: 'block', marginBottom: '0.5rem' }}>
+            <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', backgroundColor: '#fafafa', opacity: summary.excludeTools ? 0.6 : 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--foreground)', textTransform: 'uppercase', textDecoration: summary.excludeTools ? 'line-through' : 'none', margin: 0 }}>
                   TOOLS AND EQUIPMENT
                 </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.65rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={!!summary.excludeTools} 
+                      onChange={() => handleToggleExcludeContainer('tools')}
+                    />
+                    EXCLUDE
+                  </label>
+                  <button 
+                    onClick={() => handleToggleContainer('tools')}
+                    style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: 0, display: 'flex' }}
+                    onMouseOver={(e) => e.currentTarget.style.color = 'var(--destructive)'}
+                    onMouseOut={(e) => e.currentTarget.style.color = '#a1a1aa'}
+                    title="Remove Tools and Equipment"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+              <div style={{ marginBottom: '0.75rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Input
                     type="number"
@@ -747,20 +831,32 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
 
           {/* OCM - Overhead, Contingencies and Miscellaneous */}
           {showOcm && (
-            <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', backgroundColor: '#fafafa', position: 'relative' }}>
-              <button 
-                onClick={() => handleToggleContainer('ocm')}
-                style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.25rem' }}
-                onMouseOver={(e) => e.currentTarget.style.color = 'var(--destructive)'}
-                onMouseOut={(e) => e.currentTarget.style.color = '#a1a1aa'}
-                title="Remove OCM"
-              >
-                <Trash2 size={14} />
-              </button>
-              <div style={{ marginBottom: '0.75rem', paddingRight: '1.5rem' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', display: 'block', marginBottom: '0.5rem' }}>
+            <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', backgroundColor: '#fafafa', opacity: summary.excludeOcm ? 0.6 : 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--foreground)', textTransform: 'uppercase', textDecoration: summary.excludeOcm ? 'line-through' : 'none', margin: 0 }}>
                   OVERHEAD, CONTINGENCIES AND MISCELLANEOUS
                 </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.65rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={!!summary.excludeOcm} 
+                      onChange={() => handleToggleExcludeContainer('ocm')}
+                    />
+                    EXCLUDE
+                  </label>
+                  <button 
+                    onClick={() => handleToggleContainer('ocm')}
+                    style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: 0, display: 'flex' }}
+                    onMouseOver={(e) => e.currentTarget.style.color = 'var(--destructive)'}
+                    onMouseOut={(e) => e.currentTarget.style.color = '#a1a1aa'}
+                    title="Remove OCM"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+              <div style={{ marginBottom: '0.75rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Input
                     type="number"

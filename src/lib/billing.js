@@ -24,14 +24,43 @@ const saveAndNotify = async (collection, record) => {
 export async function recomputeSummaryCost(summaryId) {
   if (!summaryId) return;
   try {
+    const summary = await getFromDB('scheduleSummaries', summaryId);
+    if (!summary) return;
+
     const allItems = await getAllFromDB('summaryItems');
-    const summaryTotal = allItems
+    const totalBaseCost = allItems
       .filter(i => i.summaryId === summaryId && !i.isExcluded)
       .reduce((sum, i) => sum + (i.totalCost || 0), 0);
 
-    const summary = await getFromDB('scheduleSummaries', summaryId);
-    if (!summary) return;
-    await saveAndNotify('scheduleSummaries', { ...summary, totalCost: summaryTotal });
+    const isLaborType = summary.type === 'labor';
+    const showLabor = summary.type === 'material' && summary.showLabor !== false;
+    const showTools = summary.showTools !== false;
+    const showOcm = summary.showOcm !== false;
+
+    const laborPercentage = summary.laborPercentage || 0;
+    const toolsPercentage = summary.toolsPercentage || 0;
+    const ocmPercentage = summary.ocmPercentage || 0;
+
+    const totalLaborCost = isLaborType 
+      ? totalBaseCost
+      : (showLabor && !summary.excludeLabor ? totalBaseCost * (laborPercentage / 100) : 0);
+
+    const totalToolsCost = (showTools && !summary.excludeTools) ? (totalBaseCost * (toolsPercentage / 100)) : 0;
+
+    const ocmBase = isLaborType
+      ? totalBaseCost + totalToolsCost
+      : totalBaseCost + totalLaborCost + totalToolsCost;
+
+    const totalOcmCost = (showOcm && !summary.excludeOcm) ? (ocmBase * (ocmPercentage / 100)) : 0;
+
+    let groupTotalCost = 0;
+    if (isLaborType) {
+      groupTotalCost = totalBaseCost + totalToolsCost + totalOcmCost;
+    } else {
+      groupTotalCost = totalBaseCost + totalLaborCost + totalToolsCost + totalOcmCost;
+    }
+
+    await saveAndNotify('scheduleSummaries', { ...summary, totalCost: groupTotalCost });
 
     await recomputeScheduleCost(summary.scheduleOfWorkId);
   } catch (err) {

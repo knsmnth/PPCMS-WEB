@@ -7,7 +7,7 @@ import {
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '../components/ui/dialog';
-import { Calendar, Plus, ArrowLeft, Edit2, Trash2, Search, GripVertical, Copy, Download, Upload, ChevronDown, ChevronRight, CornerDownRight } from 'lucide-react';
+import { Calendar, Plus, ArrowLeft, Edit2, Trash2, Search, GripVertical, Copy, Download, Upload, ChevronDown, ChevronRight, CornerDownRight, Settings } from 'lucide-react';
 import { cascadeDelete, cascadeDuplicateSchedule } from '../lib/cascade';
 import { recomputeProjectCost, recomputeScheduleCost } from '../lib/billing'; // ground-truth recompute
 import { exportSchedulesTemplate, parseSchedulesExcel } from '../lib/excel';
@@ -528,6 +528,34 @@ export default function ProgramOfWorks() {
   const [editOpen, setEditOpen] = useState(false);
   const [editingWork, setEditingWork] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // ── Project Defaults State ──
+  const [defaultsOpen, setDefaultsOpen] = useState(false);
+  const [defaultLabor, setDefaultLabor] = useState('');
+  const [defaultTools, setDefaultTools] = useState('');
+  const [defaultOcm, setDefaultOcm] = useState('');
+
+  const handleOpenDefaults = () => {
+    if (project) {
+      setDefaultLabor(project.defaultLaborPercentage ?? 0);
+      setDefaultTools(project.defaultToolsPercentage ?? 0);
+      setDefaultOcm(project.defaultOcmPercentage ?? 0);
+    }
+    setDefaultsOpen(true);
+  };
+
+  const { updateItem: updateProject } = useCollection('projects');
+
+  const handleSaveDefaults = async () => {
+    if (!project) return;
+    await updateProject({
+      ...project,
+      defaultLaborPercentage: Number(defaultLabor) || 0,
+      defaultToolsPercentage: Number(defaultTools) || 0,
+      defaultOcmPercentage: Number(defaultOcm) || 0,
+    });
+    setDefaultsOpen(false);
+  };
 
   // ── Drag refs ──
   const draggingIdx = useRef(null);
@@ -946,13 +974,7 @@ export default function ProgramOfWorks() {
         <div>
           <button
             id="btn-back-projects"
-            onClick={() => {
-              if (window.history.state && window.history.state.idx > 0) {
-                navigate(-1);
-              } else {
-                navigate('/projects');
-              }
-            }}
+            onClick={() => navigate('/projects')}
             style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.8rem', cursor: 'pointer', marginBottom: '0.5rem', fontWeight: 600 }}
           >
             <ArrowLeft size={14} /> Back to Projects
@@ -996,6 +1018,9 @@ export default function ProgramOfWorks() {
             </Button>
             <Button id="btn-export-excel" variant="outline" onClick={handleExportExcel} title="Export Excel Template">
               <Download size={18} />
+            </Button>
+            <Button id="btn-project-defaults" variant="outline" onClick={handleOpenDefaults} title="Project Cost Defaults">
+              <Settings size={18} />
             </Button>
           </div>
 
@@ -1067,6 +1092,45 @@ export default function ProgramOfWorks() {
         work={editingWork}
         onSubmit={handleEdit}
       />
+
+      <Dialog open={defaultsOpen} onOpenChange={setDefaultsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Project Default Percentages</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={labelStyle}>Default Labor Requisition (%)</label>
+                <Input
+                  type="number"
+                  value={defaultLabor}
+                  onChange={e => setDefaultLabor(e.target.value)}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={labelStyle}>Default Tools and Equipment (%)</label>
+                <Input
+                  type="number"
+                  value={defaultTools}
+                  onChange={e => setDefaultTools(e.target.value)}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={labelStyle}>Default OCM (%)</label>
+                <Input
+                  type="number"
+                  value={defaultOcm}
+                  onChange={e => setDefaultOcm(e.target.value)}
+                />
+              </div>
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <Button onClick={handleSaveDefaults}>Save Defaults</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

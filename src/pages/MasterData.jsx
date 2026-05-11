@@ -347,9 +347,15 @@ export function VirtualizedMasterDataTable({ filteredData, fields, title, Icon, 
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                   {f.label}
-                  {sortConfig?.key === f.name && (
-                    <ChevronDown size={14} style={{ transform: sortConfig.direction === 'asc' ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', color: 'var(--primary)' }} />
-                  )}
+                  <ChevronDown 
+                    size={14} 
+                    style={{ 
+                      transform: sortConfig?.key === f.name && sortConfig.direction === 'asc' ? 'rotate(180deg)' : 'none', 
+                      transition: 'transform 0.2s, opacity 0.2s', 
+                      color: sortConfig?.key === f.name ? 'var(--primary)' : 'var(--muted-foreground)',
+                      opacity: sortConfig?.key === f.name ? 1 : 0.3
+                    }} 
+                  />
                 </div>
               </TableHead>
             ))}

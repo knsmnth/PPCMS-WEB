@@ -36,7 +36,7 @@ const operationsItems = [
 
 const locationItems = [
   { name: 'Campuses', path: '/campuses', icon: Building2, type: 'nav' },
-  { name: 'Facilities', path: '/facilities', icon: Building, type: 'dep' },
+  { name: 'Facilities', path: '/facilities', icon: Building, type: 'nav' },
 ];
 
 const masterDataItems = [

@@ -29,6 +29,7 @@ export default function Facilities() {
   const [editingFacility, setEditingFacility] = useState(null);
   const [editName, setEditName] = useState('');
   const [editType, setEditType] = useState('');
+  const [editCampusId, setEditCampusId] = useState('');
   
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -61,11 +62,12 @@ export default function Facilities() {
   };
 
   const handleEdit = async () => {
-    if (!editName || !editingFacility) return;
+    if (!editName || !editingFacility || !editCampusId) return;
     await updateItem({
       ...editingFacility,
       name: editName,
-      type: editType
+      type: editType,
+      campusId: editCampusId
     });
     setEditDialogOpen(false);
     setEditingFacility(null);
@@ -88,18 +90,6 @@ export default function Facilities() {
     refresh();
   };
 
-  if (!campusId) {
-    return (
-      <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '1rem', color: 'var(--muted-foreground)' }}>
-        <Building size={48} style={{ opacity: 0.2 }} />
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)' }}>Context Required</h2>
-        <p>Please select a specific Campus from the directory to view or manage its facilities.</p>
-        <Button onClick={() => navigate('/campuses')} variant="outline" style={{ marginTop: '1rem' }}>
-          Return to Campuses
-        </Button>
-      </div>
-    );
-  }
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -147,7 +137,6 @@ export default function Facilities() {
                     onChange={setSelectedCampusId}
                     options={campuses.map(c => ({ value: c.id, label: c.name }))}
                     placeholder="Select a campus..."
-                    disabled={true}
                   />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -230,6 +219,7 @@ export default function Facilities() {
                       setEditingFacility(f);
                       setEditName(f.name);
                       setEditType(f.type || '');
+                      setEditCampusId(f.campusId || '');
                       setEditDialogOpen(true);
                     }}
                     style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.5rem' }}
@@ -265,6 +255,15 @@ export default function Facilities() {
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Facility</DialogTitle></DialogHeader>
           <DialogBody>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Campus Assignment</label>
+              <SelectCombo 
+                value={editCampusId} 
+                onChange={setEditCampusId}
+                options={campuses.map(c => ({ value: c.id, label: c.name }))}
+                placeholder="Select a campus..."
+              />
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Facility Name</label>
               <Input placeholder="e.g. Science Laboratory" value={editName} onChange={(e) => setEditName(e.target.value)} />

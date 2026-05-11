@@ -252,128 +252,30 @@ function WorkGroup({ mainWork, subWorks, onDragStart, onDragOver, onDrop, onDrag
         onCreateSub={() => { setExpanded(true); onCreateSub(mainWork.id); }}
       />
 
-      {/* Sub-schedule nested panel */}
-      {hasSubs && expanded && (
-        <TableRow style={{ background: 'transparent' }}>
-          <TableCell colSpan={6} style={{ padding: '0 0 0 48px', border: 'none' }}>
-            <div style={{
-              borderLeft: '2px solid var(--border)',
-              marginBottom: '4px',
-              borderRadius: '0 0 0 4px',
-            }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <tbody>
-                  {subWorks
-                    .slice()
-                    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-                    .map((subWork, i) => (
-                      <SubRow
-                        key={subWork.id}
-                        work={subWork}
-                        index={i}
-                        total={subWorks.length}
-                        onDragStart={onDragStart}
-                        onDragOver={onDragOver}
-                        onDrop={onDrop}
-                        onDragEnd={onDragEnd}
-                        onNavigate={onNavigate}
-                        onToggleExclude={onToggleExclude}
-                        onDuplicate={onDuplicate}
-                        onEdit={onEdit}
-                        onDelete={onDelete}
-                      />
-                    ))}
-                </tbody>
-              </table>
-            </div>
-          </TableCell>
-        </TableRow>
-      )}
+      {hasSubs && expanded && subWorks
+        .slice()
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+        .map((subWork) => (
+          <WorkRow
+            key={subWork.id}
+            work={subWork}
+            isSub={true}
+            onDragStart={onDragStart}
+            onDragOver={onDragOver}
+            onDrop={onDrop}
+            onDragEnd={onDragEnd}
+            onNavigate={onNavigate}
+            onToggleExclude={onToggleExclude}
+            onDuplicate={onDuplicate}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
+        ))
+      }
     </>
   );
 }
 
-function SubRow({ work, index, total, onDragStart, onDragOver, onDrop, onDragEnd, onNavigate, onToggleExclude, onDuplicate, onEdit, onDelete }) {
-  const lastDragEnd = useRef(0);
-  const isLast = index === total - 1;
-
-  return (
-    <tr
-      draggable
-      style={{
-        cursor: 'pointer',
-        transition: 'background 0.15s',
-        borderBottom: isLast ? 'none' : '1px solid var(--border)',
-      }}
-      onMouseEnter={e => e.currentTarget.style.background = 'var(--muted)'}
-      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-      onDragStart={e => {
-        e.currentTarget.style.opacity = '0.35';
-        e.dataTransfer.effectAllowed = 'move';
-        onDragStart(work.id, work.parentId);
-      }}
-      onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderTop = '2px solid var(--primary)'; onDragOver(); }}
-      onDragLeave={e => { e.currentTarget.style.borderTop = ''; }}
-      onDrop={e => { e.currentTarget.style.borderTop = ''; e.currentTarget.style.opacity = '1'; onDrop(work.id, work.parentId); }}
-      onDragEnd={e => { e.currentTarget.style.opacity = '1'; lastDragEnd.current = Date.now(); onDragEnd(); }}
-      onClick={() => { if (Date.now() - lastDragEnd.current < 300) return; onNavigate(work.id); }}
-    >
-      {/* Drag handle + exclude checkbox — matches parent WorkRow layout */}
-      <td style={{ width: 48, padding: '0.6rem 0.5rem', verticalAlign: 'middle' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--muted-foreground)' }}>
-          <GripVertical size={14} style={{ cursor: 'grab', opacity: 0.5 }} />
-          <CornerDownRight size={13} />
-          <input
-            type="checkbox"
-            checked={!!work.isExcluded}
-            onChange={() => onToggleExclude(work)}
-            onClick={e => e.stopPropagation()}
-            title={work.isExcluded ? 'Excluded — click to include' : 'Included — click to exclude'}
-            style={{ width: 14, height: 14, cursor: 'pointer', accentColor: 'var(--primary)', marginLeft: 2 }}
-          />
-        </div>
-      </td>
-
-      {/* Name */}
-      <td style={{ padding: '0.6rem 0.5rem', verticalAlign: 'middle' }}>
-        <span style={{
-          fontSize: '0.875rem',
-          fontWeight: 600,
-          color: work.isExcluded ? 'var(--muted-foreground)' : 'var(--foreground)',
-          textDecoration: work.isExcluded ? 'line-through' : 'none',
-        }}>
-          {work.name}
-        </span>
-      </td>
-
-      {/* Specs */}
-      <td style={{ padding: '0.6rem 0.5rem', verticalAlign: 'middle', color: 'var(--muted-foreground)', fontSize: '0.85rem' }}>
-        {work.description || ''}
-      </td>
-
-      {/* Work code */}
-      <td style={{ width: 145, textAlign: 'center', padding: '0.6rem 0.5rem', verticalAlign: 'middle' }}>
-        <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--primary)', fontFamily: 'monospace', letterSpacing: '0.02em' }}>
-          {work.workCode || '—'}
-        </span>
-      </td>
-
-      {/* Cost */}
-      <td style={{ width: 160, textAlign: 'right', padding: '0.6rem 0.5rem', verticalAlign: 'middle', fontWeight: 700, fontSize: '0.875rem', color: work.isExcluded ? 'var(--muted-foreground)' : 'var(--foreground)' }}>
-        ₱{(work.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-      </td>
-
-      {/* Actions */}
-      <td style={{ width: 120, textAlign: 'right', padding: '0.6rem 0.5rem', verticalAlign: 'middle' }} onClick={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', gap: 2, justifyContent: 'flex-end', alignItems: 'center' }}>
-          <ActionBtn onClick={() => onDuplicate(work)} title="Duplicate"><Copy size={13} /></ActionBtn>
-          <ActionBtn onClick={() => onEdit(work)} title="Edit"><Edit2 size={13} /></ActionBtn>
-          <ActionBtn onClick={() => onDelete(work.id)} title="Delete" destructive><Trash2 size={13} /></ActionBtn>
-        </div>
-      </td>
-    </tr>
-  );
-}
 
 function WorkRow({ work, isSub, expanded, onToggleExpand, hasSubs, onCreateSub, onDragStart, onDragOver, onDrop, onDragEnd, onNavigate, onToggleExclude, onDuplicate, onEdit, onDelete }) {
   // Track when the last drag ended so we can suppress the subsequent click
@@ -382,7 +284,10 @@ function WorkRow({ work, isSub, expanded, onToggleExpand, hasSubs, onCreateSub, 
   return (
     <TableRow
       draggable
-      style={{ cursor: 'pointer' }}
+      style={{ 
+        cursor: 'pointer',
+        backgroundColor: isSub ? '#fcfcfc' : 'white',
+      }}
       className="hover:bg-muted/50"
       onDragStart={e => {
         e.currentTarget.style.opacity = '0.35';
@@ -399,12 +304,12 @@ function WorkRow({ work, isSub, expanded, onToggleExpand, hasSubs, onCreateSub, 
       }}
       onDragLeave={e => {
         e.currentTarget.style.boxShadow = '';
-        e.currentTarget.style.backgroundColor = '';
+        e.currentTarget.style.backgroundColor = isSub ? '#fcfcfc' : '';
       }}
       onDrop={e => {
         e.preventDefault();
         e.currentTarget.style.boxShadow = '';
-        e.currentTarget.style.backgroundColor = '';
+        e.currentTarget.style.backgroundColor = isSub ? '#fcfcfc' : '';
         onDrop(work.id, work.parentId);
       }}
       onDragEnd={e => {
@@ -415,7 +320,7 @@ function WorkRow({ work, isSub, expanded, onToggleExpand, hasSubs, onCreateSub, 
       onClick={() => { if (Date.now() - lastDragEnd.current < 300) return; onNavigate(work.id); }}
     >
       {/* ── Drag grip + exclude checkbox ── */}
-      <TableCell style={{ padding: '0.75rem 0.5rem', width: 80, paddingLeft: isSub ? '2.5rem' : '0.5rem' }}>
+      <TableCell style={{ padding: '0.75rem 0.5rem', width: 100, paddingLeft: isSub ? '1.5rem' : '0.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
           <span
             style={{ cursor: 'grab', color: '#a1a1aa', display: 'flex', alignItems: 'center', userSelect: 'none' }}
@@ -446,8 +351,9 @@ function WorkRow({ work, isSub, expanded, onToggleExpand, hasSubs, onCreateSub, 
         <div style={{
           fontWeight: isSub ? 600 : 700,
           fontSize: '0.95rem',
-          color: work.isExcluded ? 'var(--muted-foreground)' : 'var(--primary)',
+          color: work.isExcluded ? 'var(--muted-foreground)' : (isSub ? 'var(--foreground)' : 'var(--primary)'),
           textDecoration: work.isExcluded ? 'line-through' : 'none',
+          paddingLeft: isSub ? '0.5rem' : 0
         }}>
           {work.name}
         </div>
@@ -455,8 +361,8 @@ function WorkRow({ work, isSub, expanded, onToggleExpand, hasSubs, onCreateSub, 
 
       {/* ── Specifications ── */}
       <TableCell>
-        <div style={{ fontSize: '0.82rem', color: '#52525b', maxWidth: 320, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-          {work.description || 'No specifications provided.'}
+        <div style={{ fontSize: '0.82rem', color: '#52525b', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+          {work.description || '—'}
         </div>
       </TableCell>
 
@@ -468,7 +374,13 @@ function WorkRow({ work, isSub, expanded, onToggleExpand, hasSubs, onCreateSub, 
       </TableCell>
 
       {/* ── Cost ── */}
-      <TableCell style={{ textAlign: 'right', width: 160, fontWeight: 700, color: work.isExcluded ? 'var(--muted-foreground)' : 'var(--foreground)' }}>
+      <TableCell style={{ 
+        textAlign: 'right', 
+        width: 160, 
+        fontWeight: 700, 
+        color: work.isExcluded ? 'var(--muted-foreground)' : 'var(--foreground)',
+        paddingRight: isSub ? '0.5rem' : '1.5rem'
+      }}>
         ₱{(work.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
       </TableCell>
 
@@ -1035,12 +947,12 @@ export default function ProgramOfWorks() {
         <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
           <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--background)' }}>
             <TableRow>
-              <TableHead style={{ width: 60 }} />
+              <TableHead style={{ width: 100 }} />
               <TableHead>WORK NAME</TableHead>
               <TableHead>WORK SPECIFICATIONS</TableHead>
               <TableHead style={{ width: 145, textAlign: 'center' }}>WORK CODE</TableHead>
               <TableHead style={{ textAlign: 'right', width: 160 }}>TOTAL WORK COST</TableHead>
-              <TableHead style={{ width: 95 }} />
+              <TableHead style={{ width: 120 }} />
             </TableRow>
           </TableHeader>
           <TableBody>

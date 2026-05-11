@@ -219,6 +219,14 @@ export default function SummaryWorkspace() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
       {summaries.map(summary => {
         const groupItems = items.filter(i => i.summaryId === summary.id);
+        const showLaborState = summary.type === 'material' && summary.showLabor !== false;
+        const showToolsState = summary.showTools !== false;
+        const showOcmState = summary.showOcm !== false;
+        const hasAnyContainerObj = showLaborState || showToolsState || showOcmState;
+        
+        const totalBaseCostObj = groupItems
+          .filter(i => !i.isExcluded)
+          .reduce((sum, item) => sum + (item.totalCost || 0), 0);
         
         return (
           <div key={summary.id} className="animate-fade-in" style={{ backgroundColor: 'var(--background)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)', overflow: 'hidden' }}>
@@ -248,9 +256,11 @@ export default function SummaryWorkspace() {
                   </label>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.1rem' }}>TOTAL WORK COST</div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.1rem' }}>
+                    {summary.type === 'labor' ? 'TOTAL LABOR COST' : 'TOTAL MATERIAL COST'}
+                  </div>
                   <div style={{ fontWeight: 800, fontSize: '1.4rem', color: 'var(--primary)', letterSpacing: '-0.03em' }}>
-                    ₱{(summary.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    ₱{totalBaseCostObj.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', borderLeft: '1px solid var(--border)', paddingLeft: '1rem' }}>
@@ -372,8 +382,14 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
   const [toolsPercentage, setToolsPercentage] = useState(summary.toolsPercentage || 0);
   const [ocmPercentage, setOcmPercentage] = useState(summary.ocmPercentage || 0);
 
+  const [showTools, setShowTools] = useState(summary.showTools !== false);
+  const [showOcm, setShowOcm] = useState(summary.showOcm !== false);
+  const [showLaborState, setShowLaborState] = useState(summary.showLabor !== false);
+
   // Calculate costs based on summary type
   const isLaborType = summary.type === 'labor';
+
+  const showLabor = summary.type === 'material' && showLaborState;
 
   // Calculate total from items (this is the "base cost" for calculations)
   // For material type: this is the material cost
@@ -383,24 +399,20 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
     .reduce((sum, item) => sum + (item.totalCost || 0), 0);
 
   // For labor type: total labor cost is the base cost (from items)
-  // For material type: labor cost is a percentage of material cost
+  // For material type: labor cost is a percentage of material cost (if shown)
   const totalLaborCost = isLaborType
     ? totalBaseCost
-    : totalBaseCost * (laborPercentage / 100);
+    : (showLabor ? totalBaseCost * (laborPercentage / 100) : 0);
 
-  // Tools and Equipment cost is based on the base cost
-  // For material type: base cost = material cost
-  // For labor type: base cost = labor cost
-  const totalToolsCost = totalBaseCost * (toolsPercentage / 100);
+  // Tools and Equipment cost is based on the base cost (if shown)
+  const totalToolsCost = showTools ? (totalBaseCost * (toolsPercentage / 100)) : 0;
 
-  // OCM cost is based on (base cost + labor cost + tools cost)
-  // For material: OCM = (material + labor + tools) * ocm%
-  // For labor: OCM = (labor + tools) * ocm% (labor is already the base)
+  // OCM cost is based on (base cost + labor cost + tools cost) (if shown)
   const ocmBase = isLaborType
-    ? totalBaseCost + totalToolsCost  // For labor: base is labor cost, no separate labor cost to add
-    : totalBaseCost + totalLaborCost + totalToolsCost;  // For material: material + labor + tools
+    ? totalBaseCost + totalToolsCost
+    : totalBaseCost + totalLaborCost + totalToolsCost;
 
-  const totalOcmCost = ocmBase * (ocmPercentage / 100);
+  const totalOcmCost = showOcm ? (ocmBase * (ocmPercentage / 100)) : 0;
 
   const groupTotalCost = useMemo(() => {
     if (isLaborType) {
@@ -421,6 +433,29 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
       }
     }
   }, [groupTotalCost, summary.totalCost, updateSummary, summary]);
+
+  const handleToggleContainer = async (type) => {
+    const updates = { ...summary };
+    if (type === 'labor') {
+      const newVal = !showLabor;
+      setShowLaborState(newVal);
+      updates.showLabor = newVal;
+      if (!newVal) { setLaborPercentage(0); updates.laborPercentage = 0; }
+    } else if (type === 'tools') {
+      const newVal = !showTools;
+      setShowTools(newVal);
+      updates.showTools = newVal;
+      if (!newVal) { setToolsPercentage(0); updates.toolsPercentage = 0; }
+    } else if (type === 'ocm') {
+      const newVal = !showOcm;
+      setShowOcm(newVal);
+      updates.showOcm = newVal;
+      if (!newVal) { setOcmPercentage(0); updates.ocmPercentage = 0; }
+    }
+    await updateSummary(updates);
+  };
+
+  const hasAnyContainer = showLabor || showTools || showOcm;
 
   const handlePercentageChange = async (type, value) => {
     const updates = { ...summary };
@@ -636,84 +671,133 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
       </div>
 
       {/* Cost Breakdown Section with Percentage Rates */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem', borderTop: '1px solid var(--border)', paddingTop: '1.25rem', paddingLeft: '1.25rem', paddingRight: '1.25rem', paddingBottom: '1.25rem', marginBottom: '0.5rem' }}>
-        {/* Labor Requisition - only show for material type */}
-        {summary.type === 'material' && (
-          <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', backgroundColor: '#fafafa' }}>
-            <div style={{ marginBottom: '0.75rem' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', display: 'block', marginBottom: '0.5rem' }}>
-                LABOR REQUISITION
-              </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Input
-                  type="number"
-                  placeholder="0"
-                  value={laborPercentage}
-                  onChange={(e) => handlePercentageChange('labor', Number(e.target.value))}
-                  style={{ flex: 1, height: '2.25rem' }}
-                />
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>%</span>
+      {(showLabor || showTools || showOcm) && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem', borderTop: '1px solid var(--border)', paddingTop: '1.25rem', paddingLeft: '1.25rem', paddingRight: '1.25rem', paddingBottom: '1.25rem', marginBottom: '0.5rem' }}>
+          {/* Labor Requisition - only show for material type */}
+          {summary.type === 'material' && showLabor && (
+            <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', backgroundColor: '#fafafa', position: 'relative' }}>
+              <button 
+                onClick={() => handleToggleContainer('labor')}
+                style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.25rem' }}
+                onMouseOver={(e) => e.currentTarget.style.color = 'var(--destructive)'}
+                onMouseOut={(e) => e.currentTarget.style.color = '#a1a1aa'}
+                title="Remove Labor Requisition"
+              >
+                <Trash2 size={14} />
+              </button>
+              <div style={{ marginBottom: '0.75rem', paddingRight: '1.5rem' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', display: 'block', marginBottom: '0.5rem' }}>
+                  LABOR REQUISITION
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Input
+                    type="number"
+                    placeholder="0"
+                    value={laborPercentage}
+                    onChange={(e) => handlePercentageChange('labor', Number(e.target.value))}
+                    style={{ flex: 1, height: '2.25rem' }}
+                  />
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>%</span>
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.25rem' }}>TOTAL LABOR COST</div>
+                <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>
+                  ₱{totalLaborCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </div>
               </div>
             </div>
-            <div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.25rem' }}>TOTAL LABOR COST</div>
-              <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>
-                ₱{totalLaborCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          )}
+
+          {/* Tools and Equipment */}
+          {showTools && (
+            <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', backgroundColor: '#fafafa', position: 'relative' }}>
+              <button 
+                onClick={() => handleToggleContainer('tools')}
+                style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.25rem' }}
+                onMouseOver={(e) => e.currentTarget.style.color = 'var(--destructive)'}
+                onMouseOut={(e) => e.currentTarget.style.color = '#a1a1aa'}
+                title="Remove Tools and Equipment"
+              >
+                <Trash2 size={14} />
+              </button>
+              <div style={{ marginBottom: '0.75rem', paddingRight: '1.5rem' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', display: 'block', marginBottom: '0.5rem' }}>
+                  TOOLS AND EQUIPMENT
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Input
+                    type="number"
+                    placeholder="0"
+                    value={toolsPercentage}
+                    onChange={(e) => handlePercentageChange('tools', Number(e.target.value))}
+                    style={{ flex: 1, height: '2.25rem' }}
+                  />
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>%</span>
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.25rem' }}>TOTAL TOOLS AND EQUIPMENT COST</div>
+                <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>
+                  ₱{totalToolsCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Tools and Equipment */}
-        <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', backgroundColor: '#fafafa' }}>
-          <div style={{ marginBottom: '0.75rem' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', display: 'block', marginBottom: '0.5rem' }}>
-              TOOLS AND EQUIPMENT
-            </label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Input
-                type="number"
-                placeholder="0"
-                value={toolsPercentage}
-                onChange={(e) => handlePercentageChange('tools', Number(e.target.value))}
-                style={{ flex: 1, height: '2.25rem' }}
-              />
-              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>%</span>
+          {/* OCM - Overhead, Contingencies and Miscellaneous */}
+          {showOcm && (
+            <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', backgroundColor: '#fafafa', position: 'relative' }}>
+              <button 
+                onClick={() => handleToggleContainer('ocm')}
+                style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.25rem' }}
+                onMouseOver={(e) => e.currentTarget.style.color = 'var(--destructive)'}
+                onMouseOut={(e) => e.currentTarget.style.color = '#a1a1aa'}
+                title="Remove OCM"
+              >
+                <Trash2 size={14} />
+              </button>
+              <div style={{ marginBottom: '0.75rem', paddingRight: '1.5rem' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', display: 'block', marginBottom: '0.5rem' }}>
+                  OVERHEAD, CONTINGENCIES AND MISCELLANEOUS
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Input
+                    type="number"
+                    placeholder="0"
+                    value={ocmPercentage}
+                    onChange={(e) => handlePercentageChange('ocm', Number(e.target.value))}
+                    style={{ flex: 1, height: '2.25rem' }}
+                  />
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>%</span>
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.25rem' }}>TOTAL OCM COST</div>
+                <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>
+                  ₱{totalOcmCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </div>
+              </div>
             </div>
-          </div>
-          <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.25rem' }}>TOTAL TOOLS AND EQUIPMENT COST</div>
-            <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>
-              ₱{totalToolsCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-            </div>
+          )}
+        </div>
+      )}
+      
+      {(!showLabor || !showTools || !showOcm) && (
+        <div style={{ padding: '0 1.25rem 1.25rem 1.25rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {summary.type === 'material' && !showLabor && (
+              <Button variant="outline" size="sm" onClick={() => handleToggleContainer('labor')}>+ Add Labor Requisition</Button>
+            )}
+            {!showTools && (
+              <Button variant="outline" size="sm" onClick={() => handleToggleContainer('tools')}>+ Add Tools & Equipment</Button>
+            )}
+            {!showOcm && (
+              <Button variant="outline" size="sm" onClick={() => handleToggleContainer('ocm')}>+ Add OCM</Button>
+            )}
           </div>
         </div>
-
-        {/* OCM - Overhead, Contingencies and Miscellaneous */}
-        <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', backgroundColor: '#fafafa' }}>
-          <div style={{ marginBottom: '0.75rem' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', display: 'block', marginBottom: '0.5rem' }}>
-              OVERHEAD, CONTINGENCIES AND MISCELLANEOUS
-            </label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Input
-                type="number"
-                placeholder="0"
-                value={ocmPercentage}
-                onChange={(e) => handlePercentageChange('ocm', Number(e.target.value))}
-                style={{ flex: 1, height: '2.25rem' }}
-              />
-              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>%</span>
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.25rem' }}>TOTAL OCM COST</div>
-            <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>
-              ₱{totalOcmCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-            </div>
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -421,14 +421,8 @@ function AddItemForm({ summary, onAdd, MasterDataSelector }) {
           <Input type="number" placeholder="1" value={duration} onChange={e => setDuration(e.target.value)} style={{ width: '80px', height: '2.5rem' }} />
         </div>
       )}
-      {isLabor && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)' }}>UNIT (persons/day)</span>
-          <Input type="number" placeholder="1" value={unit} onChange={e => setUnit(e.target.value)} style={{ width: '80px', height: '2.5rem' }} />
-        </div>
-      )}
       <div style={{ alignSelf: 'flex-end', paddingBottom: '2px' }}>
-        <Button size="md" onClick={() => { onAdd(selected, qty, duration, unit); setSelected(null); setQty(''); setDuration('1'); setUnit('1'); }} disabled={!selected || !qty}>
+        <Button size="md" onClick={() => { onAdd(selected, qty, duration); setSelected(null); setQty(''); setDuration('1'); }} disabled={!selected || !qty}>
           Add to Ledger
         </Button>
       </div>
@@ -445,6 +439,16 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
   const [showTools, setShowTools] = useState(summary.showTools !== false);
   const [showOcm, setShowOcm] = useState(summary.showOcm !== false);
   const [showLaborState, setShowLaborState] = useState(summary.showLabor !== false);
+
+  // Sync local state when summary prop changes (e.g. from database)
+  useEffect(() => {
+    setLaborPercentage(summary.laborPercentage || 0);
+    setToolsPercentage(summary.toolsPercentage || 0);
+    setOcmPercentage(summary.ocmPercentage || 0);
+    setShowTools(summary.showTools !== false);
+    setShowOcm(summary.showOcm !== false);
+    setShowLaborState(summary.showLabor !== false);
+  }, [summary.id, summary.laborPercentage, summary.toolsPercentage, summary.ocmPercentage, summary.showTools, summary.showOcm, summary.showLabor]);
 
   // Calculate costs based on summary type
   const isLaborType = summary.type === 'labor';
@@ -484,79 +488,145 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
   }, [isLaborType, totalBaseCost, totalLaborCost, totalToolsCost, totalOcmCost]);
 
   // Sync summary.totalCost with groupTotalCost (sum of the 3 boxes)
-  const prevGroupTotalCost = useRef(groupTotalCost);
+  // We use a ref to track if we're currently updating to avoid race conditions
+  const isUpdatingRef = useRef(false);
+
   useEffect(() => {
-    if (prevGroupTotalCost.current !== groupTotalCost) {
-      prevGroupTotalCost.current = groupTotalCost;
-      if (summary.totalCost !== groupTotalCost) {
-        updateSummary({ ...summary, totalCost: groupTotalCost }).then(() => {
-          if (summary.scheduleOfWorkId) {
-            recomputeScheduleCost(summary.scheduleOfWorkId);
-          }
-        });
-      }
+    if (isUpdatingRef.current) return;
+
+    if (Math.abs((summary.totalCost || 0) - groupTotalCost) > 0.01) {
+      isUpdatingRef.current = true;
+      updateSummary({ ...summary, totalCost: groupTotalCost }).then(() => {
+        if (summary.scheduleOfWorkId) {
+          recomputeScheduleCost(summary.scheduleOfWorkId);
+        }
+        isUpdatingRef.current = false;
+      }).catch(() => {
+        isUpdatingRef.current = false;
+      });
     }
   }, [groupTotalCost, summary.totalCost, updateSummary, summary]);
 
   const handleToggleContainer = async (type) => {
     const updates = { ...summary };
+    let newLaborShow = showLaborState;
+    let newToolsShow = showTools;
+    let newOcmShow = showOcm;
+    let newLaborPerc = laborPercentage;
+    let newToolsPerc = toolsPercentage;
+    let newOcmPerc = ocmPercentage;
+
     if (type === 'labor') {
-      const newVal = !showLaborState;
-      setShowLaborState(newVal);
-      updates.showLabor = newVal;
-      if (!newVal) { setLaborPercentage(0); updates.laborPercentage = 0; }
+      newLaborShow = !showLaborState;
+      setShowLaborState(newLaborShow);
+      updates.showLabor = newLaborShow;
+      if (!newLaborShow) { newLaborPerc = 0; setLaborPercentage(0); updates.laborPercentage = 0; }
       else {
-        const globalVal = projectContext?.defaultLaborPercentage || 0;
-        setLaborPercentage(globalVal);
-        updates.laborPercentage = globalVal;
+        newLaborPerc = projectContext?.defaultLaborPercentage || 0;
+        setLaborPercentage(newLaborPerc);
+        updates.laborPercentage = newLaborPerc;
       }
     } else if (type === 'tools') {
-      const newVal = !showTools;
-      setShowTools(newVal);
-      updates.showTools = newVal;
-      if (!newVal) { setToolsPercentage(0); updates.toolsPercentage = 0; }
+      newToolsShow = !showTools;
+      setShowTools(newToolsShow);
+      updates.showTools = newToolsShow;
+      if (!newToolsShow) { newToolsPerc = 0; setToolsPercentage(0); updates.toolsPercentage = 0; }
       else {
-        const globalVal = projectContext?.defaultToolsPercentage || 0;
-        setToolsPercentage(globalVal);
-        updates.toolsPercentage = globalVal;
+        newToolsPerc = projectContext?.defaultToolsPercentage || 0;
+        setToolsPercentage(newToolsPerc);
+        updates.toolsPercentage = newToolsPerc;
       }
     } else if (type === 'ocm') {
-      const newVal = !showOcm;
-      setShowOcm(newVal);
-      updates.showOcm = newVal;
-      if (!newVal) { setOcmPercentage(0); updates.ocmPercentage = 0; }
+      newOcmShow = !showOcm;
+      setShowOcm(newOcmShow);
+      updates.showOcm = newOcmShow;
+      if (!newOcmShow) { newOcmPerc = 0; setOcmPercentage(0); updates.ocmPercentage = 0; }
       else {
-        const globalVal = projectContext?.defaultOcmPercentage || 0;
-        setOcmPercentage(globalVal);
-        updates.ocmPercentage = globalVal;
+        newOcmPerc = projectContext?.defaultOcmPercentage || 0;
+        setOcmPercentage(newOcmPerc);
+        updates.ocmPercentage = newOcmPerc;
       }
     }
+
+    // Recompute total cost
+    const laborCost = isLaborType ? totalBaseCost : (newLaborShow && !summary.excludeLabor ? totalBaseCost * (newLaborPerc / 100) : 0);
+    const toolsCost = (newToolsShow && !summary.excludeTools) ? (totalBaseCost * (newToolsPerc / 100)) : 0;
+    const ocmBaseVal = isLaborType ? totalBaseCost + toolsCost : totalBaseCost + laborCost + toolsCost;
+    const ocmCost = (newOcmShow && !summary.excludeOcm) ? (ocmBaseVal * (newOcmPerc / 100)) : 0;
+    const newTotal = isLaborType ? totalBaseCost + toolsCost + ocmCost : totalBaseCost + laborCost + toolsCost + ocmCost;
+
+    updates.totalCost = newTotal;
+    isUpdatingRef.current = true;
     await updateSummary(updates);
+    if (summary.scheduleOfWorkId) {
+      await recomputeScheduleCost(summary.scheduleOfWorkId);
+    }
+    isUpdatingRef.current = false;
   };
 
   const handleToggleExcludeContainer = async (type) => {
     const updates = { ...summary };
-    if (type === 'labor') updates.excludeLabor = !summary.excludeLabor;
-    else if (type === 'tools') updates.excludeTools = !summary.excludeTools;
-    else if (type === 'ocm') updates.excludeOcm = !summary.excludeOcm;
+    let newExclLabor = summary.excludeLabor;
+    let newExclTools = summary.excludeTools;
+    let newExclOcm = summary.excludeOcm;
+
+    if (type === 'labor') { updates.excludeLabor = !summary.excludeLabor; newExclLabor = updates.excludeLabor; }
+    else if (type === 'tools') { updates.excludeTools = !summary.excludeTools; newExclTools = updates.excludeTools; }
+    else if (type === 'ocm') { updates.excludeOcm = !summary.excludeOcm; newExclOcm = updates.excludeOcm; }
+
+    // Recompute total cost
+    const laborCost = isLaborType ? totalBaseCost : (showLaborState && !newExclLabor ? totalBaseCost * (laborPercentage / 100) : 0);
+    const toolsCost = (showTools && !newExclTools) ? (totalBaseCost * (toolsPercentage / 100)) : 0;
+    const ocmBaseVal = isLaborType ? totalBaseCost + toolsCost : totalBaseCost + laborCost + toolsCost;
+    const ocmCost = (showOcm && !newExclOcm) ? (ocmBaseVal * (ocmPercentage / 100)) : 0;
+    const newTotal = isLaborType ? totalBaseCost + toolsCost + ocmCost : totalBaseCost + laborCost + toolsCost + ocmCost;
+
+    updates.totalCost = newTotal;
+    isUpdatingRef.current = true;
     await updateSummary(updates);
+    if (summary.scheduleOfWorkId) {
+      await recomputeScheduleCost(summary.scheduleOfWorkId);
+    }
+    isUpdatingRef.current = false;
   };
 
   const hasAnyContainer = showLabor || showTools || showOcm;
 
   const handlePercentageChange = async (type, value) => {
     const updates = { ...summary };
+    let newLabor = laborPercentage;
+    let newTools = toolsPercentage;
+    let newOcm = ocmPercentage;
+
     if (type === 'labor') {
       setLaborPercentage(value);
+      newLabor = value;
       updates.laborPercentage = value;
     } else if (type === 'tools') {
       setToolsPercentage(value);
+      newTools = value;
       updates.toolsPercentage = value;
     } else if (type === 'ocm') {
       setOcmPercentage(value);
+      newOcm = value;
       updates.ocmPercentage = value;
     }
+
+    // Recompute total cost immediately to avoid race condition with useEffect
+    const laborCost = isLaborType ? totalBaseCost : (showLabor && !summary.excludeLabor ? totalBaseCost * (newLabor / 100) : 0);
+    const toolsCost = (showTools && !summary.excludeTools) ? (totalBaseCost * (newTools / 100)) : 0;
+    const ocmBaseVal = isLaborType ? totalBaseCost + toolsCost : totalBaseCost + laborCost + toolsCost;
+    const ocmCost = (showOcm && !summary.excludeOcm) ? (ocmBaseVal * (newOcm / 100)) : 0;
+    
+    const newTotal = isLaborType ? totalBaseCost + toolsCost + ocmCost : totalBaseCost + laborCost + toolsCost + ocmCost;
+    
+    updates.totalCost = newTotal;
+    isUpdatingRef.current = true;
     await updateSummary(updates);
+    if (summary.scheduleOfWorkId) {
+      await recomputeScheduleCost(summary.scheduleOfWorkId);
+    }
+    isUpdatingRef.current = false;
   };
 
   const rowVirtualizer = useVirtualizer({
@@ -580,10 +650,10 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
             <TableRow>
               <TableHead>Item Name</TableHead>
               <TableHead style={{ textAlign: 'center', width: '120px' }}>Qty</TableHead>
-              {isLaborType && (
-                <TableHead style={{ textAlign: 'center', width: '80px' }}>Duration (days)</TableHead>
-              )}
               <TableHead style={{ textAlign: 'center', width: '80px' }}>Unit</TableHead>
+              {isLaborType && (
+                <TableHead style={{ textAlign: 'center', width: '120px' }}>Duration (days)</TableHead>
+              )}
               <TableHead style={{ textAlign: 'right' }}>Unit Price</TableHead>
               <TableHead style={{ textAlign: 'right' }}>Total Item Cost</TableHead>
               <TableHead style={{ textAlign: 'right', width: '80px' }}>Exclude</TableHead>
@@ -619,15 +689,17 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
                         const newQty = Number(e.target.value);
                         if (newQty >= 0) {
                           const duration = item.duration || 1;
-                          const unit = isLaborType ? (item.unit || 1) : 1;
                           const newTotalCost = isLaborType
-                            ? item.unitCostAtTimeOfAdding * unit * duration * newQty
+                            ? item.unitCostAtTimeOfAdding * duration * newQty
                             : item.unitCostAtTimeOfAdding * newQty;
                           await updateSummaryItem({ ...item, quantity: newQty, totalCost: newTotalCost });
                         }
                       }}
                       style={{ width: '80px', height: '2rem', textAlign: 'center', padding: '0 0.25rem', margin: '0 auto' }}
                     />
+                  </TableCell>
+                  <TableCell style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
+                    {item.unit || '-'}
                   </TableCell>
                   {isLaborType && (
                     <TableCell style={{ textAlign: 'center', fontWeight: 600 }}>
@@ -637,8 +709,7 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
                         onChange={async (e) => {
                           const newDuration = Number(e.target.value);
                           if (newDuration >= 0) {
-                            const unit = item.unit || 1;
-                            const newTotalCost = item.unitCostAtTimeOfAdding * unit * newDuration * item.quantity;
+                            const newTotalCost = item.unitCostAtTimeOfAdding * newDuration * item.quantity;
                             await updateSummaryItem({ ...item, duration: newDuration, totalCost: newTotalCost });
                           }
                         }}
@@ -646,25 +717,6 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
                       />
                     </TableCell>
                   )}
-                  <TableCell style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
-                    {isLaborType ? (
-                      <Input
-                        type="number"
-                        value={item.unit || 1}
-                        onChange={async (e) => {
-                          const newUnit = Number(e.target.value);
-                          if (newUnit >= 0) {
-                            const duration = item.duration || 1;
-                            const newTotalCost = item.unitCostAtTimeOfAdding * newUnit * duration;
-                            await updateSummaryItem({ ...item, unit: newUnit, totalCost: newTotalCost });
-                          }
-                        }}
-                        style={{ width: '80px', height: '2rem', textAlign: 'center', padding: '0 0.25rem', margin: '0 auto', fontSize: '0.8rem' }}
-                      />
-                    ) : (
-                      item.unit || '-'
-                    )}
-                  </TableCell>
                   <TableCell style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>₱{item.unitCostAtTimeOfAdding.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
                   <TableCell style={{ textAlign: 'right', fontWeight: 800, color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>
                      ₱{item.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -709,7 +761,7 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
       <div style={{ borderTop: '1px solid var(--border)', padding: '1.25rem', backgroundColor: 'var(--background)' }}>
         <AddItemForm
           summary={summary}
-          onAdd={async (selectedMasterItem, qty, durationInput, unitInput) => {
+          onAdd={async (selectedMasterItem, qty, durationInput) => {
             if (!selectedMasterItem || !qty) return;
             const unitCost = Number(selectedMasterItem.currentPrice || selectedMasterItem.currentRate || 0);
             const quantity = Number(qty);
@@ -719,9 +771,8 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
             if (existingItem) {
               const newQty = existingItem.quantity + quantity;
               const duration = existingItem.duration || 1;
-              const unit = summary.type === 'labor' ? (existingItem.unit || 1) : 1;
               const newTotalCost = summary.type === 'labor'
-                ? existingItem.unitCostAtTimeOfAdding * unit * duration * newQty
+                ? existingItem.unitCostAtTimeOfAdding * duration * newQty
                 : existingItem.unitCostAtTimeOfAdding * newQty;
 
               await updateSummaryItem({
@@ -732,9 +783,8 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
             } else {
               const isLabor = summary.type === 'labor';
               const duration = isLabor ? (Number(durationInput) || 1) : 1;
-              const unit = isLabor ? (Number(unitInput) || 1) : 1;
               const totalCost = isLabor
-                ? unitCost * unit * duration * quantity
+                ? unitCost * duration * quantity
                 : unitCost * quantity;
 
               const newItem = {
@@ -742,7 +792,7 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
                 summaryId: summary.id,
                 referenceId: selectedMasterItem.id,
                 name: selectedMasterItem.name,
-                unit: isLabor ? unit : (selectedMasterItem.unit || ''),
+                unit: selectedMasterItem.unit || '',
                 quantity,
                 ...(isLabor && { duration }),
                 unitCostAtTimeOfAdding: unitCost,

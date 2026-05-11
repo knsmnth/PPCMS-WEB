@@ -317,7 +317,8 @@ export function MaterialsDescriptionAndPrices() {
 export function LaborManager() {
   return <MasterDataManager title="Human Capital" collectionName="laborTypes" icon={Users} fields={[
     { name: 'name', label: 'Personnel Role' },
-    { name: 'currentRate', label: 'Standard Rate (₱)', type: 'number', sortable: false }
+    { name: 'currentRate', label: 'Standard Rate (₱)', type: 'number', sortable: false },
+    { name: 'unit', label: 'Unit', sortable: false }
   ]} />;
 }
 

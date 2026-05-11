@@ -32,14 +32,17 @@ export async function recomputeSummaryCost(summaryId) {
       .filter(i => i.summaryId === summaryId && !i.isExcluded)
       .reduce((sum, i) => sum + (i.totalCost || 0), 0);
 
+    const sched = await getFromDB('schedulesOfWork', summary.scheduleOfWorkId);
+    const project = sched ? await getFromDB('projects', sched.projectId) : null;
+
     const isLaborType = summary.type === 'labor';
     const showLabor = summary.type === 'material' && summary.showLabor !== false;
     const showTools = summary.showTools !== false;
     const showOcm = summary.showOcm !== false;
 
-    const laborPercentage = summary.laborPercentage || 0;
-    const toolsPercentage = summary.toolsPercentage || 0;
-    const ocmPercentage = summary.ocmPercentage || 0;
+    const laborPercentage = summary.laborPercentage || project?.defaultLaborPercentage || 0;
+    const toolsPercentage = summary.toolsPercentage || project?.defaultToolsPercentage || 0;
+    const ocmPercentage = summary.ocmPercentage || project?.defaultOcmPercentage || 0;
 
     const totalLaborCost = isLaborType 
       ? totalBaseCost

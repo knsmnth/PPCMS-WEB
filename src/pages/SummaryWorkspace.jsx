@@ -45,31 +45,27 @@ export default function SummaryWorkspace() {
   const navigate = useNavigate();
   const [summaryName, setSummaryName] = useState('');
   const [summaryType, setSummaryType] = useState('material');
-  const [summaryUnit, setSummaryUnit] = useState('person/day');
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingSummary, setEditingSummary] = useState(null);
   const [editSummaryName, setEditSummaryName] = useState('');
   const [editSummaryType, setEditSummaryType] = useState('material');
-  const [editSummaryUnit, setEditSummaryUnit] = useState('person/day');
   
   const handleCreateSummary = async () => {
     if (!summaryName || !scheduleId) return;
     const id = crypto.randomUUID();
-    const unit = summaryType === 'labor' ? summaryUnit : '';
     await createSummary({ 
       id, 
       scheduleOfWorkId: scheduleId, 
       name: summaryName, 
       type: summaryType, 
-      unit, 
+      unit: '', 
       totalCost: 0,
-      laborPercentage: projectContext?.defaultLaborPercentage || 0,
-      toolsPercentage: projectContext?.defaultToolsPercentage || 0,
-      ocmPercentage: projectContext?.defaultOcmPercentage || 0,
+      laborPercentage: 0,
+      toolsPercentage: 0,
+      ocmPercentage: 0,
     });
     setSummaryName('');
-    setSummaryUnit('person/day');
   };
 
   const handleEditSummary = async () => {
@@ -77,13 +73,9 @@ export default function SummaryWorkspace() {
     const updates = {
       ...editingSummary,
       name: editSummaryName,
-      type: editSummaryType
+      type: editSummaryType,
+      unit: ''
     };
-    if (editSummaryType === 'labor') {
-      updates.unit = editSummaryUnit;
-    } else {
-      updates.unit = '';
-    }
     await updateSummary(updates);
     setEditDialogOpen(false);
     setEditingSummary(null);
@@ -213,12 +205,6 @@ export default function SummaryWorkspace() {
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Category Title</label>
                 <Input placeholder="e.g. Site Groundworks" value={summaryName} onChange={(e) => setSummaryName(e.target.value)} />
               </div>
-              {summaryType === 'labor' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Unit (e.g. person/day)</label>
-                  <Input placeholder="person/day" value={summaryUnit} onChange={(e) => setSummaryUnit(e.target.value)} />
-                </div>
-              )}
             </DialogBody>
             <DialogFooter>
               <DialogClose asChild><Button onClick={handleCreateSummary} disabled={!scheduleId}>Initialize Category</Button></DialogClose>
@@ -330,7 +316,6 @@ export default function SummaryWorkspace() {
                       setEditingSummary(summary);
                       setEditSummaryName(summary.name);
                       setEditSummaryType(summary.type);
-                      setEditSummaryUnit(summary.unit || 'person/day');
                       setEditDialogOpen(true);
                     }}
                     style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.2rem' }}
@@ -382,12 +367,6 @@ export default function SummaryWorkspace() {
               <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Category Title</label>
               <Input placeholder="e.g. Site Groundworks" value={editSummaryName} onChange={(e) => setEditSummaryName(e.target.value)} />
             </div>
-            {editSummaryType === 'labor' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Unit (e.g. person/day)</label>
-                <Input placeholder="person/day" value={editSummaryUnit} onChange={(e) => setEditSummaryUnit(e.target.value)} />
-              </div>
-            )}
           </DialogBody>
           <DialogFooter>
             <Button onClick={handleEditSummary}>Confirm Edits</Button>
@@ -464,19 +443,23 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
 
   // For labor type: total labor cost is the base cost (from items)
   // For material type: labor cost is a percentage of material cost (if shown and not excluded)
+  const effectiveLaborPerc = laborPercentage || projectContext?.defaultLaborPercentage || 0;
+  const effectiveToolsPerc = toolsPercentage || projectContext?.defaultToolsPercentage || 0;
+  const effectiveOcmPerc = ocmPercentage || projectContext?.defaultOcmPercentage || 0;
+
   const totalLaborCost = isLaborType
     ? totalBaseCost
-    : (showLabor && !summary.excludeLabor ? totalBaseCost * (laborPercentage / 100) : 0);
+    : (showLabor && !summary.excludeLabor ? totalBaseCost * (effectiveLaborPerc / 100) : 0);
 
   // Tools and Equipment cost is based on the base cost (if shown and not excluded)
-  const totalToolsCost = (showTools && !summary.excludeTools) ? (totalBaseCost * (toolsPercentage / 100)) : 0;
+  const totalToolsCost = (showTools && !summary.excludeTools) ? (totalBaseCost * (effectiveToolsPerc / 100)) : 0;
 
   // OCM cost is based on (base cost + labor cost + tools cost) (if shown and not excluded)
   const ocmBase = isLaborType
     ? totalBaseCost + totalToolsCost
     : totalBaseCost + totalLaborCost + totalToolsCost;
 
-  const totalOcmCost = (showOcm && !summary.excludeOcm) ? (ocmBase * (ocmPercentage / 100)) : 0;
+  const totalOcmCost = (showOcm && !summary.excludeOcm) ? (ocmBase * (effectiveOcmPerc / 100)) : 0;
 
   const groupTotalCost = useMemo(() => {
     if (isLaborType) {
@@ -522,9 +505,10 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
       updates.showLabor = newLaborShow;
       if (!newLaborShow) { newLaborPerc = 0; setLaborPercentage(0); updates.laborPercentage = 0; }
       else {
-        newLaborPerc = projectContext?.defaultLaborPercentage || 0;
-        setLaborPercentage(newLaborPerc);
-        updates.laborPercentage = newLaborPerc;
+        // When enabling, we keep it 0 so it uses global by default
+        newLaborPerc = 0;
+        setLaborPercentage(0);
+        updates.laborPercentage = 0;
       }
     } else if (type === 'tools') {
       newToolsShow = !showTools;
@@ -532,9 +516,9 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
       updates.showTools = newToolsShow;
       if (!newToolsShow) { newToolsPerc = 0; setToolsPercentage(0); updates.toolsPercentage = 0; }
       else {
-        newToolsPerc = projectContext?.defaultToolsPercentage || 0;
-        setToolsPercentage(newToolsPerc);
-        updates.toolsPercentage = newToolsPerc;
+        newToolsPerc = 0;
+        setToolsPercentage(0);
+        updates.toolsPercentage = 0;
       }
     } else if (type === 'ocm') {
       newOcmShow = !showOcm;
@@ -542,17 +526,21 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
       updates.showOcm = newOcmShow;
       if (!newOcmShow) { newOcmPerc = 0; setOcmPercentage(0); updates.ocmPercentage = 0; }
       else {
-        newOcmPerc = projectContext?.defaultOcmPercentage || 0;
-        setOcmPercentage(newOcmPerc);
-        updates.ocmPercentage = newOcmPerc;
+        newOcmPerc = 0;
+        setOcmPercentage(0);
+        updates.ocmPercentage = 0;
       }
     }
 
-    // Recompute total cost
-    const laborCost = isLaborType ? totalBaseCost : (newLaborShow && !summary.excludeLabor ? totalBaseCost * (newLaborPerc / 100) : 0);
-    const toolsCost = (newToolsShow && !summary.excludeTools) ? (totalBaseCost * (newToolsPerc / 100)) : 0;
+    // Recompute total cost with fallback logic
+    const effLabor = newLaborPerc || projectContext?.defaultLaborPercentage || 0;
+    const effTools = newToolsPerc || projectContext?.defaultToolsPercentage || 0;
+    const effOcm = newOcmPerc || projectContext?.defaultOcmPercentage || 0;
+
+    const laborCost = isLaborType ? totalBaseCost : (newLaborShow && !summary.excludeLabor ? totalBaseCost * (effLabor / 100) : 0);
+    const toolsCost = (newToolsShow && !summary.excludeTools) ? (totalBaseCost * (effTools / 100)) : 0;
     const ocmBaseVal = isLaborType ? totalBaseCost + toolsCost : totalBaseCost + laborCost + toolsCost;
-    const ocmCost = (newOcmShow && !summary.excludeOcm) ? (ocmBaseVal * (newOcmPerc / 100)) : 0;
+    const ocmCost = (newOcmShow && !summary.excludeOcm) ? (ocmBaseVal * (effOcm / 100)) : 0;
     const newTotal = isLaborType ? totalBaseCost + toolsCost + ocmCost : totalBaseCost + laborCost + toolsCost + ocmCost;
 
     updates.totalCost = newTotal;
@@ -575,10 +563,14 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
     else if (type === 'ocm') { updates.excludeOcm = !summary.excludeOcm; newExclOcm = updates.excludeOcm; }
 
     // Recompute total cost
-    const laborCost = isLaborType ? totalBaseCost : (showLaborState && !newExclLabor ? totalBaseCost * (laborPercentage / 100) : 0);
-    const toolsCost = (showTools && !newExclTools) ? (totalBaseCost * (toolsPercentage / 100)) : 0;
+    const effLabor = laborPercentage || projectContext?.defaultLaborPercentage || 0;
+    const effTools = toolsPercentage || projectContext?.defaultToolsPercentage || 0;
+    const effOcm = ocmPercentage || projectContext?.defaultOcmPercentage || 0;
+
+    const laborCost = isLaborType ? totalBaseCost : (showLaborState && !newExclLabor ? totalBaseCost * (effLabor / 100) : 0);
+    const toolsCost = (showTools && !newExclTools) ? (totalBaseCost * (effTools / 100)) : 0;
     const ocmBaseVal = isLaborType ? totalBaseCost + toolsCost : totalBaseCost + laborCost + toolsCost;
-    const ocmCost = (showOcm && !newExclOcm) ? (ocmBaseVal * (ocmPercentage / 100)) : 0;
+    const ocmCost = (showOcm && !newExclOcm) ? (ocmBaseVal * (effOcm / 100)) : 0;
     const newTotal = isLaborType ? totalBaseCost + toolsCost + ocmCost : totalBaseCost + laborCost + toolsCost + ocmCost;
 
     updates.totalCost = newTotal;
@@ -613,10 +605,14 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
     }
 
     // Recompute total cost immediately to avoid race condition with useEffect
-    const laborCost = isLaborType ? totalBaseCost : (showLabor && !summary.excludeLabor ? totalBaseCost * (newLabor / 100) : 0);
-    const toolsCost = (showTools && !summary.excludeTools) ? (totalBaseCost * (newTools / 100)) : 0;
+    const effLabor = newLabor || projectContext?.defaultLaborPercentage || 0;
+    const effTools = newTools || projectContext?.defaultToolsPercentage || 0;
+    const effOcm = newOcm || projectContext?.defaultOcmPercentage || 0;
+
+    const laborCost = isLaborType ? totalBaseCost : (showLabor && !summary.excludeLabor ? totalBaseCost * (effLabor / 100) : 0);
+    const toolsCost = (showTools && !summary.excludeTools) ? (totalBaseCost * (effTools / 100)) : 0;
     const ocmBaseVal = isLaborType ? totalBaseCost + toolsCost : totalBaseCost + laborCost + toolsCost;
-    const ocmCost = (showOcm && !summary.excludeOcm) ? (ocmBaseVal * (newOcm / 100)) : 0;
+    const ocmCost = (showOcm && !summary.excludeOcm) ? (ocmBaseVal * (effOcm / 100)) : 0;
     
     const newTotal = isLaborType ? totalBaseCost + toolsCost + ocmCost : totalBaseCost + laborCost + toolsCost + ocmCost;
     
@@ -841,12 +837,15 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Input
                     type="number"
-                    placeholder="0"
-                    value={laborPercentage}
+                    placeholder={`${projectContext?.defaultLaborPercentage || 0}`}
+                    value={laborPercentage === 0 ? '' : laborPercentage}
                     onChange={(e) => handlePercentageChange('labor', Number(e.target.value))}
                     style={{ flex: 1, height: '2.25rem' }}
                   />
                   <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>%</span>
+                  {laborPercentage === 0 && (
+                    <span style={{ fontSize: '0.6rem', color: 'var(--primary)', fontWeight: 700, marginLeft: '0.25rem' }}>GLOBAL</span>
+                  )}
                 </div>
               </div>
               <div>
@@ -889,12 +888,15 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Input
                     type="number"
-                    placeholder="0"
-                    value={toolsPercentage}
+                    placeholder={`${projectContext?.defaultToolsPercentage || 0}`}
+                    value={toolsPercentage === 0 ? '' : toolsPercentage}
                     onChange={(e) => handlePercentageChange('tools', Number(e.target.value))}
                     style={{ flex: 1, height: '2.25rem' }}
                   />
                   <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>%</span>
+                  {toolsPercentage === 0 && (
+                    <span style={{ fontSize: '0.6rem', color: 'var(--primary)', fontWeight: 700, marginLeft: '0.25rem' }}>GLOBAL</span>
+                  )}
                 </div>
               </div>
               <div>
@@ -937,12 +939,15 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Input
                     type="number"
-                    placeholder="0"
-                    value={ocmPercentage}
+                    placeholder={`${projectContext?.defaultOcmPercentage || 0}`}
+                    value={ocmPercentage === 0 ? '' : ocmPercentage}
                     onChange={(e) => handlePercentageChange('ocm', Number(e.target.value))}
                     style={{ flex: 1, height: '2.25rem' }}
                   />
                   <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>%</span>
+                  {ocmPercentage === 0 && (
+                    <span style={{ fontSize: '0.6rem', color: 'var(--primary)', fontWeight: 700, marginLeft: '0.25rem' }}>GLOBAL</span>
+                  )}
                 </div>
               </div>
               <div>

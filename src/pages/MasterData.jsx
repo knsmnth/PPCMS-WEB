@@ -5,8 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose, DialogBody, DialogFooter } from '../components/ui/dialog';
-import { Package, Plus, Trash2, Search, Info, Users, Wrench, History, Edit2, ChevronDown, Download, Upload } from 'lucide-react';
-import { exportMasterDataTemplate, parseMasterDataExcel } from '../lib/excel';
+import { Package, Plus, Trash2, Search, Info, Users, Wrench, History, Edit2, ChevronDown } from 'lucide-react';
 
 function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
   const { data, createItem, updateItem, deleteItem } = useCollection(collectionName);
@@ -33,68 +32,13 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
     }));
   };
 
-  const handleExportExcel = async () => {
-    try {
-      await exportMasterDataTemplate(title, fields, data);
-    } catch (e) {
-      console.error(e);
-      alert('Failed to export Excel.');
-    }
-  };
+const handleExportExcel = async () => {
+     alert('Excel export has been removed. Please use JSON export instead.');
+   };
 
-  const handleImportExcel = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const rows = await parseMasterDataExcel(file, title, fields);
-      let count = 0;
-      
-      for (const row of rows) {
-        if (!row.name) continue;
-
-        if (row.id) {
-          const existing = data.find(item => item.id === row.id);
-          if (existing) {
-            let historyUpdates = existing.priceHistory || [];
-            const isRate = fields.some(f => f.name === 'currentRate');
-            const priceField = isRate ? 'currentRate' : 'currentPrice';
-            
-            const currentPriceNum = Number(existing[priceField] || 0);
-            const newPriceNum = Number(row[priceField] || 0);
-
-            if (newPriceNum !== currentPriceNum) {
-              const historyEntry = { price: newPriceNum, date: new Date().toISOString() };
-              historyUpdates = [historyEntry, ...historyUpdates];
-            }
-
-            await updateItem({
-              ...existing,
-              ...row,
-              priceHistory: historyUpdates
-            });
-            count++;
-          }
-        } else {
-          const id = crypto.randomUUID();
-          const p = { id, ...row, createdAt: new Date().toISOString() };
-          
-          let initialPrice = 0;
-          if (p.currentPrice) p.currentPrice = Number(p.currentPrice), initialPrice = p.currentPrice;
-          if (p.currentRate) p.currentRate = Number(p.currentRate), initialPrice = p.currentRate;
-
-          p.priceHistory = [{ price: initialPrice, date: p.createdAt }];
-          await createItem(p);
-          count++;
-        }
-      }
-      alert(`Successfully processed ${count} records.`);
-    } catch (err) {
-      console.error(err);
-      alert('Failed to import Excel. Ensure it matches the template.');
-    } finally {
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
+   const handleImportExcel = async (e) => {
+     alert('Excel import has been removed. Please use JSON import instead.');
+   };
 
   const handleCreate = async () => {
     const id = crypto.randomUUID();
@@ -183,15 +127,7 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
         
         <div style={{ display: 'flex', gap: '1rem' }}>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <input type="file" accept=".xlsx" ref={fileInputRef} style={{ display: 'none' }} onChange={handleImportExcel} />
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()} title="Import Excel">
-              <Upload size={18} />
-            </Button>
-            <Button variant="outline" onClick={handleExportExcel} title="Export Excel Template">
-              <Download size={18} />
-            </Button>
-          </div>
-          <div style={{ position: 'relative', width: '240px' }}>
+            <div style={{ position: 'relative', width: '240px' }}>
             <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted-foreground)' }} />
             <Input 
               style={{ paddingLeft: '2.25rem', height: '2.5rem' }}
@@ -221,9 +157,10 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
                 <DialogClose asChild><Button onClick={handleCreate}>Commit to Registry</Button></DialogClose>
               </DialogFooter>
             </DialogContent>
-          </Dialog>
-        </div>
-      </header>
+           </Dialog>
+         </div>
+       </div>
+       </header>
 
       <div style={{ borderRadius: 'var(--radius)', overflow: 'hidden' }}>
         <VirtualizedMasterDataTable 

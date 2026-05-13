@@ -7,11 +7,12 @@ import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose, DialogBody, DialogFooter } from '../components/ui/dialog';
 import { Folder, Plus, Edit2, Trash2, Search, Copy, ChevronDown, ArrowRight, Download, Upload } from 'lucide-react';
 import { cascadeDelete, cascadeDuplicateProject } from '../lib/cascade';
-import { exportProjectsTemplate, parseProjectsExcel } from '../lib/excel';
 import { SelectCombo } from '../components/ui/select-combo';
 import { Select } from '../components/ui/select';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { recomputeFacilityCost } from '../lib/billing';
+import { recomputeFacilityCost, recomputeProjectCostsDeep } from '../lib/billing';
+import { exportProjectsToJson, importProjectsFromJson, saveItem } from '../lib/projectExport';
+import { Database, FileJson, Loader2, CheckSquare, Square, Eye, EyeOff } from 'lucide-react';
 
 export default function Projects() {
   const [searchParams] = useSearchParams();
@@ -56,6 +57,69 @@ export default function Projects() {
   const [sortConfig, setSortConfig] = useState({ key: 'projectCode', direction: 'asc' });
   const [priorityFilter, setPriorityFilter] = useState('All');
   const [yearFilter, setYearFilter] = useState('All');
+
+  // Selection state
+   const [selectedProjectIds, setSelectedProjectIds] = useState(new Set());
+   const [isImporting, setIsImporting] = useState(false);
+   const [importProgress, setImportProgress] = useState(0);
+   const [dataOpsOpen, setDataOpsOpen] = useState(false);
+   const dataOpsTimeoutRef = useRef(null);
+
+  const jsonFileInputRef = useRef(null);
+
+  const toggleSelection = (id) => {
+    const next = new Set(selectedProjectIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedProjectIds(next);
+  };
+
+  const toggleAll = (visibleProjects) => {
+    if (selectedProjectIds.size === visibleProjects.length) {
+      setSelectedProjectIds(new Set());
+    } else {
+      setSelectedProjectIds(new Set(visibleProjects.map(p => p.id)));
+    }
+  };
+
+  const handleJsonExport = async () => {
+    if (selectedProjectIds.size === 0) {
+      alert('Please select at least one project to export.');
+      return;
+    }
+    await exportProjectsToJson(Array.from(selectedProjectIds));
+    alert('Export completed successfully.');
+  };
+
+  const handleJsonImport = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    setImportProgress(0);
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          await importProjectsFromJson(event.target.result, (p) => setImportProgress(p));
+          alert('Projects imported successfully.');
+          refresh();
+        } catch (err) {
+          alert('Failed to import JSON: ' + err.message);
+        } finally {
+          setIsImporting(false);
+          setImportProgress(0);
+        }
+      };
+      reader.readAsText(file);
+    } catch (err) {
+      console.error(err);
+      setIsImporting(false);
+    } finally {
+      if (jsonFileInputRef.current) jsonFileInputRef.current.value = '';
+    }
+  };
 
   const generateProjectCode = (existingProjects) => {
     const yearPrefix = new Date().getFullYear().toString().slice(-2);
@@ -137,10 +201,19 @@ export default function Projects() {
     overscan: 10,
   });
 
-  const virtualRows = rowVirtualizer.getVirtualItems();
-  const totalSize = rowVirtualizer.getTotalSize();
-  const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
-  const paddingBottom = virtualRows.length > 0 ? totalSize - virtualRows[virtualRows.length - 1].end : 0;
+   const virtualRows = rowVirtualizer.getVirtualItems();
+   const totalSize = rowVirtualizer.getTotalSize();
+   const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
+   const paddingBottom = virtualRows.length > 0 ? totalSize - virtualRows[virtualRows.length - 1].end : 0;
+
+   // Cleanup timeout on unmount
+   React.useEffect(() => {
+     return () => {
+       if (dataOpsTimeoutRef.current) {
+         clearTimeout(dataOpsTimeoutRef.current);
+       }
+     };
+   }, []);
 
   const handleSort = (key) => {
     setSortConfig(prev => ({
@@ -262,74 +335,13 @@ export default function Projects() {
 
   const fileInputRef = useRef(null);
 
-  const handleExportExcel = async () => {
-    try {
-      await exportProjectsTemplate(campuses, facilities, processedData);
-    } catch (e) {
-      console.error(e);
-      alert('Failed to export Excel.');
-    }
-  };
+const handleExportExcel = async () => {
+     alert('Excel export has been removed. Please use JSON export instead.');
+   };
 
-  const handleImportExcel = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const rows = await parseProjectsExcel(file);
-      let count = 0;
-      let currentProjects = [...projects];
-
-      for (const row of rows) {
-        if (!row.name) continue;
-
-        const fac = facilities.find(f => f.name === row.facilityName);
-        const facilityIdToSave = fac ? fac.id : '';
-
-        if (row.id) {
-          // Update existing
-          const existing = currentProjects.find(p => p.id === row.id);
-          if (existing) {
-            const updated = {
-              ...existing,
-              name: row.name,
-              description: row.description,
-              priority: row.priority,
-              status: row.status,
-              facilityId: facilityIdToSave
-            };
-            await updateItem(updated);
-            currentProjects = currentProjects.map(p => p.id === row.id ? updated : p);
-            count++;
-          }
-        } else {
-          // Create new
-          const pCode = generateProjectCode(currentProjects);
-          const newProject = {
-            id: crypto.randomUUID(),
-            projectCode: pCode,
-            name: row.name,
-            description: row.description,
-            priority: row.priority,
-            status: row.status,
-            facilityId: facilityIdToSave,
-            createdAt: new Date().toISOString(),
-            statusHistory: [{ status: row.status, changedAt: Date.now() }],
-            totalCost: 0
-          };
-          await createItem(newProject);
-          currentProjects.push(newProject);
-          count++;
-        }
-      }
-      alert(`Successfully processed ${count} projects.`);
-      refresh();
-    } catch (err) {
-      console.error(err);
-      alert('Failed to import Excel. Ensure it matches the template.');
-    } finally {
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
+   const handleImportExcel = async (e) => {
+     alert('Excel import has been removed. Please use JSON import instead.');
+   };
 
   const getPriorityColor = (level) => {
     switch (level?.toLowerCase()) {
@@ -388,15 +400,68 @@ export default function Projects() {
               style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', fontSize: '0.9rem', color: 'var(--foreground)' }}
             />
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <input type="file" accept=".xlsx" ref={fileInputRef} style={{ display: 'none' }} onChange={handleImportExcel} />
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()} title="Import Excel">
-              <Upload size={18} />
+          <div className="data-ops-dropdown" style={{ position: 'relative', display: 'inline-block' }}
+            onMouseEnter={() => {
+              if (dataOpsTimeoutRef.current) {
+                clearTimeout(dataOpsTimeoutRef.current);
+                dataOpsTimeoutRef.current = null;
+              }
+              setDataOpsOpen(true);
+            }}
+            onMouseLeave={() => {
+              dataOpsTimeoutRef.current = setTimeout(() => {
+                setDataOpsOpen(false);
+              }, 2000);
+            }}
+          >
+            <Button variant="outline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Database size={18} />
+              <span>Data Ops</span>
+              <ChevronDown size={14} />
             </Button>
-            <Button variant="outline" onClick={handleExportExcel} title="Export Excel Template">
-              <Download size={18} />
-            </Button>
-          </div>
+            <div className="dropdown-content" style={{
+              display: dataOpsOpen ? 'block' : 'none',
+              position: 'absolute',
+              right: 0,
+              top: '100%',
+              backgroundColor: 'white',
+              boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
+              zIndex: 100,
+              minWidth: '220px',
+              borderRadius: 'var(--radius)',
+              border: '1px solid var(--border)',
+              marginTop: '0.5rem',
+              padding: '0.5rem'
+            }}>
+              <p style={{ margin: '0.5rem', fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>JSON Exchange (Deep Copy)</p>
+              <button 
+                onClick={handleJsonExport}
+                style={{ width: '100%', padding: '0.6rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '4px', textAlign: 'left', fontSize: '0.85rem' }}
+                onMouseOver={e => e.currentTarget.style.backgroundColor = 'var(--secondary)'}
+                onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <Download size={16} /> 
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span>Export Selection ({selectedProjectIds.size})</span>
+                  <span style={{ fontSize: '0.65rem', color: 'var(--muted-foreground)' }}>Full structure backup</span>
+                </div>
+              </button>
+              <button 
+                onClick={() => jsonFileInputRef.current?.click()}
+                style={{ width: '100%', padding: '0.6rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '4px', textAlign: 'left', fontSize: '0.85rem' }}
+                onMouseOver={e => e.currentTarget.style.backgroundColor = 'var(--secondary)'}
+                onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <Upload size={16} /> 
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span>Import Project JSON</span>
+                  <span style={{ fontSize: '0.65rem', color: 'var(--muted-foreground)' }}>Restore from .json file</span>
+                </div>
+               </button>
+             </div>
+           </div>
+          <input type="file" accept=".json" ref={jsonFileInputRef} style={{ display: 'none' }} onChange={handleJsonImport} />
+
           <Dialog>
             <DialogTrigger asChild>
               <Button style={{ backgroundColor: '#092e20', color: 'white' }}>
@@ -485,7 +550,18 @@ export default function Projects() {
         <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
           <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'var(--background)', borderBottom: '1px solid var(--border)' }}>
             <TableRow>
-              <TableHead style={{ width: 40 }} />
+              <TableHead style={{ width: 40 }}>
+                <div 
+                  style={{ cursor: 'pointer', display: 'flex', justifyContent: 'center' }} 
+                  onClick={() => toggleAll(processedData)}
+                  title="Select multiple for export/bulk actions"
+                >
+                  {selectedProjectIds.size === processedData.length && processedData.length > 0 ? <CheckSquare size={18} color="var(--primary)" /> : <Square size={18} color="var(--muted-foreground)" />}
+                </div>
+              </TableHead>
+              <TableHead style={{ width: 40, textAlign: 'center', fontSize: '0.65rem', fontWeight: 800, color: 'var(--muted-foreground)' }}>
+                INC.
+              </TableHead>
               <TableHead onClick={() => handleSort('projectCode')} style={{ cursor: 'pointer', textAlign: 'center', width: '120px', fontWeight: 700, fontSize: '0.75rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
                   PROJECT CODE <ChevronDown size={14} style={{ opacity: 0.5, transition: 'transform 0.2s', transform: sortConfig.key === 'projectCode' && sortConfig.direction === 'asc' ? 'rotate(180deg)' : 'rotate(0deg)' }} />
@@ -529,19 +605,23 @@ export default function Projects() {
                   key={p.id}
                   ref={rowVirtualizer.measureElement}
                   data-index={virtualRow.index}
-                  style={{ cursor: 'pointer', opacity: p.isExcluded ? 0.6 : 1 }}
+                  style={{ 
+                    cursor: 'pointer', 
+                    opacity: p.isExcluded ? 0.6 : 1,
+                    backgroundColor: selectedProjectIds.has(p.id) ? 'var(--secondary)' : 'transparent'
+                  }}
                   onClick={() => navigate(`/schedules?projectId=${p.id}`)}
                   className="hover:bg-muted/50"
                 >
-                  <TableCell style={{ padding: '0.75rem 0.5rem', width: 40, textAlign: 'center' }}>
-                    <input
-                      type="checkbox"
-                      checked={!!p.isExcluded}
-                      onChange={(e) => handleToggleExclude(e, p)}
-                      onClick={e => e.stopPropagation()}
-                      title={p.isExcluded ? 'Excluded — click to include' : 'Included — click to exclude'}
-                      style={{ width: 15, height: 15, cursor: 'pointer', accentColor: 'var(--primary)' }}
-                    />
+                  <TableCell onClick={(e) => { e.stopPropagation(); toggleSelection(p.id); }} style={{ width: 40, textAlign: 'center' }}>
+                    <div title="Mark for Export">
+                      {selectedProjectIds.has(p.id) ? <CheckSquare size={18} color="#2563eb" /> : <Square size={18} color="#d1d5db" />}
+                    </div>
+                  </TableCell>
+                  <TableCell style={{ width: 40, textAlign: 'center' }} onClick={(e) => { e.stopPropagation(); handleToggleExclude(e, p); }}>
+                    <div title={p.isExcluded ? 'Currently EXCLUDED from totals. Click to include.' : 'Currently INCLUDED in totals. Click to exclude.'}>
+                      {p.isExcluded ? <EyeOff size={18} color="#ef4444" style={{ opacity: 0.8 }} /> : <Eye size={18} color="#10b981" />}
+                    </div>
                   </TableCell>
                   <TableCell style={{ textAlign: 'center', fontWeight: 800, fontSize: '1.1rem', color: p.isExcluded ? 'var(--muted-foreground)' : '#092e20', textDecoration: p.isExcluded ? 'line-through' : 'none' }}>
                     {p.projectCode || '---'}
@@ -768,6 +848,26 @@ export default function Projects() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {isImporting && (
+        <div style={{ 
+          position: 'fixed', 
+          inset: 0, 
+          background: 'rgba(255,255,255,0.8)', 
+          backdropFilter: 'blur(4px)', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          zIndex: 9999 
+        }}>
+          <Loader2 className="animate-spin" size={48} color="var(--primary)" />
+          <p style={{ marginTop: '1rem', fontWeight: 700, fontSize: '1.25rem' }}>Importing Projects... {importProgress}%</p>
+          <div style={{ width: '300px', height: '8px', background: 'var(--secondary)', borderRadius: '4px', marginTop: '1rem', overflow: 'hidden' }}>
+            <div style={{ width: `${importProgress}%`, height: '100%', background: 'var(--primary)', transition: 'width 0.3s ease' }} />
+          </div>
+          <p style={{ marginTop: '0.5rem', color: 'var(--muted-foreground)', fontSize: '0.85rem' }}>Bypassing cloud limits via chunking logic...</p>
+        </div>
+      )}
     </div>
   );
 }

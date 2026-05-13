@@ -10,7 +10,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFoo
 import { Calendar, Plus, ArrowLeft, Edit2, Trash2, Search, GripVertical, Copy, Download, Upload, ChevronDown, ChevronRight, CornerDownRight, Settings } from 'lucide-react';
 import { cascadeDelete, cascadeDuplicateSchedule } from '../lib/cascade';
 import { recomputeProjectCost, recomputeScheduleCost, recomputeSummaryCost, recomputeProjectCostsDeep } from '../lib/billing'; // ground-truth recompute
-import { exportSchedulesTemplate, parseSchedulesExcel } from '../lib/excel';
 import { SelectCombo } from '../components/ui/select-combo';
 import { Layers } from 'lucide-react';
 
@@ -840,171 +839,13 @@ export default function ProgramOfWorks() {
 
   const fileInputRef = useRef(null);
 
-  const handleExportExcel = async () => {
-    try {
-      // Pass the full unfiltered works list (worksRef) so all sub-schedules are included
-      await exportSchedulesTemplate(projects, worksRef.current, project?.name ?? '');
-    } catch (e) {
-      console.error('Excel export failed:', e);
-      alert('Failed to export Excel. Please try again.');
-    }
-  };
+const handleExportExcel = async () => {
+     alert('Excel export has been removed. Please use JSON export instead.');
+   };
 
-  /**
-   * Imports a schedules Excel file produced by exportSchedulesTemplate.
-   *
-   * Strategy:
-   *  1. Parse all rows from the file.
-   *  2. Separate into "updates" (have an existing ID) and "creates" (no ID).
-   *  3. Process updates first — patch name / description / isExcluded in-place.
-   *  4. For creates: resolve parentId by matching parentWorkCode against the
-   *     live works snapshot (including newly-created items from this batch).
-   *     Create main schedules (no parentWorkCode) before sub-schedules so that
-   *     parent IDs are always available when children are saved.
-   *  5. After all writes, run a full computeWorkCodeUpdates reindex so every
-   *     work code is correct and contiguous.
-   */
-  const handleImportExcel = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const rows = await parseSchedulesExcel(file);
-
-      // Working copy of all persisted works — kept up-to-date as we create/update
-      let snapshot = [...worksRef.current];
-      let count = 0;
-
-      // ── Step 1: Updates — rows with an existing ID ──────────────────────────
-      const updateRows = rows.filter(r => r.id);
-      for (const row of updateRows) {
-        if (!row.name) continue;
-
-        const existing = snapshot.find(w => w.id === row.id);
-        if (!existing) continue; // ID not found — skip silently
-
-        const proj = projects.find(p => p.name === row.projectName);
-        const projId = proj?.id ?? existing.projectId; // fall back to existing project
-
-        const updated = {
-          ...existing,
-          name:        row.name,
-          description: row.description || '',
-          projectId:   projId,
-          isExcluded:  row.isExcluded ?? existing.isExcluded,
-          // parentId intentionally NOT updated via Excel — use the UI to restructure hierarchy
-        };
-        await updateItem(updated);
-        snapshot = snapshot.map(w => w.id === row.id ? updated : w);
-        count++;
-      }
-
-      // ── Step 2: Creates — rows without an ID ───────────────────────────────
-      const createRows = rows.filter(r => !r.id && r.name);
-
-      // Split into mains (no parentWorkCode) and subs (have parentWorkCode)
-      // Mains must be persisted first so subs can resolve their parentId.
-      const mainCreateRows = createRows.filter(r => !r.parentWorkCode);
-      const subCreateRows  = createRows.filter(r =>  r.parentWorkCode);
-
-      /**
-       * Helper — appends a new work item to the DB and to our local snapshot.
-       * Returns the new item so callers can reference its id/workCode immediately.
-       */
-      const persistNewWork = async ({ projectId: projId, parentId, name, description, isExcluded }) => {
-        const allInProject = snapshot.filter(w => w.projectId === projId);
-        const siblings     = allInProject.filter(w => (w.parentId || null) === (parentId || null));
-        const maxOrder     = siblings.reduce((m, w) => Math.max(m, w.order ?? 0), -1);
-
-        const newWork = {
-          id:          crypto.randomUUID(),
-          projectId:   projId,
-          parentId:    parentId || null,
-          name,
-          description: description || '',
-          workCode:    '',          // will be corrected by the reindex pass at the end
-          order:       maxOrder + 1,
-          totalCost:   0,
-          isExcluded:  isExcluded ?? false,
-          createdAt:   new Date().toISOString(),
-        };
-
-        await createItem(newWork);
-        snapshot.push(newWork);
-        count++;
-        return newWork;
-      };
-
-      // Create main schedules
-      for (const row of mainCreateRows) {
-        const proj = projects.find(p => p.name === row.projectName);
-        const projId = proj?.id ?? projectId; // fall back to the currently-open project
-        if (!projId) continue;
-
-        await persistNewWork({
-          projectId:   projId,
-          parentId:    null,
-          name:        row.name,
-          description: row.description,
-          isExcluded:  row.isExcluded,
-        });
-      }
-
-      // Create sub-schedules — resolve parentId via parentWorkCode
-      for (const row of subCreateRows) {
-        const proj = projects.find(p => p.name === row.projectName);
-        const projId = proj?.id ?? projectId;
-        if (!projId) continue;
-
-        // Find the parent in the live snapshot by its workCode
-        const parentWork = snapshot.find(
-          w => w.projectId === projId &&
-               !w.parentId &&
-               w.workCode === row.parentWorkCode
-        );
-
-        if (!parentWork) {
-          // Parent not found — create as a top-level work and warn
-          console.warn(
-            `[import] Sub-schedule "${row.name}" references unknown parent work code` +
-            ` "${row.parentWorkCode}" — importing as a main schedule instead.`
-          );
-          await persistNewWork({
-            projectId:   projId,
-            parentId:    null,
-            name:        row.name,
-            description: row.description,
-            isExcluded:  row.isExcluded,
-          });
-          continue;
-        }
-
-        await persistNewWork({
-          projectId:   projId,
-          parentId:    parentWork.id,
-          name:        row.name,
-          description: row.description,
-          isExcluded:  row.isExcluded,
-        });
-      }
-
-      // ── Step 3: Full reindex — correct all work codes for the active project ──
-      const pCode = projectCodeRef.current;
-      const projectSnapshot = snapshot.filter(w => w.projectId === projectId);
-      const codeUpdates = computeWorkCodeUpdates(projectSnapshot, pCode);
-      if (codeUpdates.length) {
-        await Promise.all(codeUpdates.map(u => updateItem(u)));
-      }
-
-      alert(`Successfully imported ${count} schedule${count !== 1 ? 's' : ''}.`);
-      refresh();
-    } catch (err) {
-      console.error('Excel import failed:', err);
-      alert('Failed to import Excel.\n\nEnsure the file was exported from this system and matches the expected template format.');
-    } finally {
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
+   const handleImportExcel = async (e) => {
+     alert('Excel import has been removed. Please use JSON import instead.');
+   };
 
   // ─── Empty / guard state ──────────────────────────────────────────────────
 
@@ -1069,13 +910,6 @@ export default function ProgramOfWorks() {
           </div>
 
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <input type="file" accept=".xlsx" ref={fileInputRef} style={{ display: 'none' }} onChange={handleImportExcel} id="input-import-excel" />
-            <Button id="btn-import-excel" variant="outline" onClick={() => fileInputRef.current?.click()} title="Import Excel">
-              <Upload size={18} />
-            </Button>
-            <Button id="btn-export-excel" variant="outline" onClick={handleExportExcel} title="Export Excel Template">
-              <Download size={18} />
-            </Button>
             <Button id="btn-project-defaults" variant="outline" onClick={handleOpenDefaults} title="Project Cost Defaults">
               <Settings size={18} />
             </Button>

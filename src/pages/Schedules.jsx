@@ -9,9 +9,10 @@ import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '../components/ui/dialog';
 import { Calendar, Plus, ArrowLeft, Edit2, Trash2, Search, GripVertical, Copy, Download, Upload, ChevronDown, ChevronRight, CornerDownRight, Settings } from 'lucide-react';
 import { cascadeDelete, cascadeDuplicateSchedule } from '../lib/cascade';
-import { recomputeProjectCost, recomputeScheduleCost } from '../lib/billing'; // ground-truth recompute
+import { recomputeProjectCost, recomputeScheduleCost, recomputeSummaryCost, recomputeProjectCostsDeep } from '../lib/billing'; // ground-truth recompute
 import { exportSchedulesTemplate, parseSchedulesExcel } from '../lib/excel';
 import { SelectCombo } from '../components/ui/select-combo';
+import { Layers } from 'lucide-react';
 
 // ─── Pure utility functions (no React deps) ──────────────────────────────────
 
@@ -429,7 +430,16 @@ export default function ProgramOfWorks() {
   );
 
   const { data: works, createItem, updateItem, refresh } = useCollection('schedulesOfWork', query);
+  const { createItem: createWorkDirect } = useCollection('schedulesOfWork'); // for direct creation
   const { data: projects } = useCollection('projects');
+  const { data: scheduleTemplates } = useCollection('scheduleTemplates');
+  const { data: templateWorks } = useCollection('scheduleTemplateWorks');
+  const { data: templateWorkGroups } = useCollection('scheduleTemplateWorkGroups');
+  const { data: workGroupTemplates } = useCollection('workGroupTemplates');
+  const { data: workGroupTemplateItems } = useCollection('workGroupTemplateItems');
+
+  const { createItem: createSummary } = useCollection('scheduleSummaries');
+  const { createItem: createSummaryItem } = useCollection('summaryItems');
 
   // Derive project synchronously on each render — no stale closure issue
   const project = projects.find(p => p.id === projectId) ?? null;
@@ -443,6 +453,8 @@ export default function ProgramOfWorks() {
   
   // ── Project Defaults State ──
   const [defaultsOpen, setDefaultsOpen] = useState(false);
+  const [importTemplateOpen, setImportTemplateOpen] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [defaultLabor, setDefaultLabor] = useState('');
   const [defaultTools, setDefaultTools] = useState('');
   const [defaultOcm, setDefaultOcm] = useState('');
@@ -467,6 +479,139 @@ export default function ProgramOfWorks() {
       defaultOcmPercentage: Number(defaultOcm) || 0,
     });
     setDefaultsOpen(false);
+    
+    // Deep recompute all costs in the project based on new defaults
+    await recomputeProjectCostsDeep(projectId);
+    refresh();
+  };
+
+  const handleImportTemplate = async () => {
+    if (!selectedTemplateId || !projectId) return;
+    const template = scheduleTemplates.find(t => t.id === selectedTemplateId);
+    if (!template) return;
+
+    const worksToCreate = templateWorks.filter(w => w.templateId === selectedTemplateId);
+    if (worksToCreate.length === 0) {
+      alert('This template has no works defined.');
+      return;
+    }
+
+    if (works.length > 0 && !confirm('Importing a template will append works to your current project. Continue?')) {
+      return;
+    }
+
+    // Map template IDs to new instance IDs to maintain hierarchy
+    const idMap = {};
+    const rootWorks = worksToCreate.filter(w => !w.parentId);
+    const pCode = projectCodeRef.current;
+    const allImportedSummaryIds = [];
+
+    let snapshot = [...worksRef.current];
+
+    // ── Phase 1: Create Works ──
+    const persistMappedWork = async (tplWork, parentId = null) => {
+      const newId = crypto.randomUUID();
+      idMap[tplWork.id] = newId;
+
+      const siblings = snapshot.filter(w => (w.parentId || null) === (parentId || null));
+      const maxOrder = siblings.reduce((m, w) => Math.max(m, w.order ?? 0), -1);
+
+      const newWork = {
+        id: newId,
+        projectId,
+        parentId: parentId || null,
+        name: tplWork.name,
+        description: tplWork.description || '',
+        workCode: '',
+        order: maxOrder + 1,
+        totalCost: 0,
+        isExcluded: false,
+        createdAt: new Date().toISOString(),
+      };
+
+      await createWorkDirect(newWork);
+      snapshot.push(newWork);
+      return newId;
+    };
+
+    for (const root of rootWorks) {
+      const newRootId = await persistMappedWork(root);
+      const children = worksToCreate.filter(w => w.parentId === root.id);
+      for (const child of children) {
+        await persistMappedWork(child, newRootId);
+      }
+    }
+
+    // ── Phase 2: Resolve Work Codes (so they are correct before we touch summaries) ──
+    const codeUpdates = computeWorkCodeUpdates(snapshot.filter(w => w.projectId === projectId), pCode);
+    if (codeUpdates.length) {
+      for (const u of codeUpdates) {
+        await updateItem(u);
+        // Update snapshot so subsequent logic sees the correct work codes
+        const idx = snapshot.findIndex(w => w.id === u.id);
+        if (idx !== -1) snapshot[idx] = { ...snapshot[idx], ...u };
+      }
+    }
+
+    // ── Phase 3: Create Summaries and Items ──
+    for (const tplWork of worksToCreate) {
+      const newWorkId = idMap[tplWork.id];
+      const linkedGroupRefs = templateWorkGroups.filter(lg => lg.scheduleTemplateWorkId === tplWork.id);
+      
+      for (const link of linkedGroupRefs) {
+        const groupTpl = workGroupTemplates.find(gt => gt.id === link.workGroupTemplateId);
+        if (!groupTpl) continue;
+
+        const summaryId = crypto.randomUUID();
+        await createSummary({
+          id: summaryId,
+          scheduleOfWorkId: newWorkId,
+          name: groupTpl.name,
+          type: groupTpl.type,
+          unit: '',
+          totalCost: 0,
+          laborPercentage: groupTpl.laborPercentage || 0,
+          toolsPercentage: groupTpl.toolsPercentage || 0,
+          ocmPercentage: groupTpl.ocmPercentage || 0,
+          showLabor: groupTpl.showLabor ?? true,
+          showTools: groupTpl.showTools ?? true,
+          showOcm: groupTpl.showOcm ?? true,
+        });
+
+        const tplItems = workGroupTemplateItems.filter(ti => ti.templateId === groupTpl.id);
+        for (const ti of tplItems) {
+          const isLabor = groupTpl.type === 'labor';
+          const duration = isLabor ? 1 : 1;
+          const totalCost = isLabor
+            ? ti.unitPrice * duration * ti.quantity
+            : ti.unitPrice * ti.quantity;
+
+          await createSummaryItem({
+            id: crypto.randomUUID(),
+            summaryId,
+            referenceId: ti.referenceId,
+            name: ti.name,
+            unit: ti.unit || '',
+            quantity: ti.quantity,
+            ...(isLabor && { duration }),
+            unitCostAtTimeOfAdding: ti.unitPrice,
+            totalCost,
+            createdAt: new Date().toISOString()
+          });
+        }
+        allImportedSummaryIds.push(summaryId);
+      }
+    }
+
+    // ── Phase 4: Final Bottom-Up Cost Recomputation ──
+    for (const sId of allImportedSummaryIds) {
+      await recomputeSummaryCost(sId);
+    }
+
+    setImportTemplateOpen(false);
+    setSelectedTemplateId('');
+    refresh();
+    alert('Template imported successfully.');
   };
 
   // ── Drag refs ──
@@ -934,6 +1079,9 @@ export default function ProgramOfWorks() {
             <Button id="btn-project-defaults" variant="outline" onClick={handleOpenDefaults} title="Project Cost Defaults">
               <Settings size={18} />
             </Button>
+            <Button id="btn-import-template" variant="outline" onClick={() => setImportTemplateOpen(true)} title="Import Template">
+              <Layers size={18} />
+            </Button>
           </div>
 
           <Button id="btn-new-work" onClick={() => { setCreateParentId(null); setCreateOpen(true); }}>
@@ -1040,6 +1188,37 @@ export default function ProgramOfWorks() {
           </DialogBody>
           <DialogFooter>
             <Button onClick={handleSaveDefaults}>Save Defaults</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={importTemplateOpen} onOpenChange={setImportTemplateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Import Schedule Template</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.5rem' }}>
+              <p style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>
+                Select a template to populate this Program of Works with predefined items and hierarchy.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={labelStyle}>Select Template</label>
+                <select
+                  value={selectedTemplateId}
+                  onChange={e => setSelectedTemplateId(e.target.value)}
+                  style={{ width: '100%', height: '2.5rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', padding: '0 0.75rem', fontSize: '0.875rem', background: 'var(--background)', color: 'var(--foreground)' }}
+                >
+                  <option value="">-- Choose a template --</option>
+                  {scheduleTemplates.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <Button onClick={handleImportTemplate} disabled={!selectedTemplateId}>Import Structure</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

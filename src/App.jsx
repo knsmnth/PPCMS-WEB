@@ -17,6 +17,8 @@ import Projects from './pages/Projects';
 import Schedules from './pages/Schedules';
 import SummaryWorkspace from './pages/SummaryWorkspace';
 import { MaterialsDescriptionAndPrices, LaborManager } from './pages/MasterData';
+import WorkGroupTemplatesPage from './pages/WorkGroupTemplates';
+import ScheduleTemplatesPage from './pages/ScheduleTemplates';
 import AccessDenied from './pages/AccessDenied';
 import AccessManagement from './pages/AccessManagement';
 import APIIntegrations from './pages/APIIntegrations';
@@ -53,8 +55,9 @@ function AuthenticatedApp() {
             <Route path="/schedules" element={<Schedules />} />
             <Route path="/summary" element={<SummaryWorkspace />} />
             <Route path="/materials" element={<MaterialsDescriptionAndPrices />} />
-
             <Route path="/labor" element={<LaborManager />} />
+            <Route path="/work-group-templates" element={<WorkGroupTemplatesPage />} />
+            <Route path="/schedule-templates" element={<ScheduleTemplatesPage />} />
             {user.role === 'super_admin' && (
               <>
                 <Route path="/access" element={<AccessManagement />} />

@@ -149,6 +149,34 @@ export async function recomputeProjectCost(projectId) {
   }
 }
 
+/**
+ * Performs a full bottom-up recompute of every work item and category in a project.
+ * Use this when project-wide settings (like default percentages) change.
+ */
+export async function recomputeProjectCostsDeep(projectId) {
+  if (!projectId) return;
+  try {
+    const allSchedules = await getAllFromDB('schedulesOfWork');
+    const projectSchedules = allSchedules.filter(s => s.projectId === projectId);
+    
+    const allSummaries = await getAllFromDB('scheduleSummaries');
+    const projectSummaryIds = allSummaries
+      .filter(s => projectSchedules.some(ps => ps.id === s.scheduleOfWorkId))
+      .map(s => s.id);
+
+    // 1. Recompute all summaries (this will bubble up to works and eventually the project)
+    // We do this sequentially to avoid IDB transaction collisions and ensure proper bubbling
+    for (const sId of projectSummaryIds) {
+      await recomputeSummaryCost(sId);
+    }
+
+    // 2. Final project total check (in case there are works without summaries but with sub-schedules)
+    await recomputeProjectCost(projectId);
+  } catch (err) {
+    console.error('[Billing] recomputeProjectCostsDeep failed:', err);
+  }
+}
+
 export async function recomputeFacilityCost(facilityId) {
   if (!facilityId) return;
   try {

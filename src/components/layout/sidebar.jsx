@@ -17,6 +17,8 @@ import {
   HardDriveDownload,
   ChevronLeft,
   ChevronRight,
+  LayoutGrid,
+  Layers,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../../hooks/useAuth';
@@ -43,8 +45,9 @@ const locationItems = [
 
 const masterDataItems = [
   { name: 'Materials Description & Prices', path: '/materials', icon: Package },
-
   { name: 'Labor Manager', path: '/labor', icon: Users },
+  { name: 'Work Group Templates', path: '/work-group-templates', icon: LayoutGrid },
+  { name: 'Schedule Templates', path: '/schedule-templates', icon: Layers },
 ];
 
 function ProjectNavItem({ item, isCollapsed }) {

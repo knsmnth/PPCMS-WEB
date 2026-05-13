@@ -42,9 +42,15 @@ export default function SummaryWorkspace() {
   const { data: facilities } = useCollection('facilities');
   const facilityContext = projectContext ? facilities.find(f => f.id === projectContext.facilityId) : null;
   
+  const { data: workGroupTemplates } = useCollection('workGroupTemplates');
+  const { data: groupTemplateItems } = useCollection('workGroupTemplateItems');
+
   const navigate = useNavigate();
   const [summaryName, setSummaryName] = useState('');
   const [summaryType, setSummaryType] = useState('material');
+
+  const [importTemplateOpen, setImportTemplateOpen] = useState(false);
+  const [selectedGroupTemplateId, setSelectedGroupTemplateId] = useState('');
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingSummary, setEditingSummary] = useState(null);
@@ -66,6 +72,63 @@ export default function SummaryWorkspace() {
       ocmPercentage: 0,
     });
     setSummaryName('');
+  };
+
+  const handleImportCategory = async () => {
+    if (!selectedGroupTemplateId || !scheduleId) return;
+    const template = workGroupTemplates.find(t => t.id === selectedGroupTemplateId);
+    if (!template) return;
+
+    const id = crypto.randomUUID();
+    const summaryPayload = { 
+      id, 
+      scheduleOfWorkId: scheduleId, 
+      name: template.name, 
+      type: template.type, 
+      unit: '', 
+      totalCost: 0,
+      laborPercentage: template.laborPercentage || 0,
+      toolsPercentage: template.toolsPercentage || 0,
+      ocmPercentage: template.ocmPercentage || 0,
+      showLabor: template.showLabor ?? true,
+      showTools: template.showTools ?? true,
+      showOcm: template.showOcm ?? true,
+    };
+    
+    await createSummary(summaryPayload);
+
+    // Import Items
+    const itemsToImport = groupTemplateItems.filter(i => i.templateId === selectedGroupTemplateId);
+    if (itemsToImport.length > 0) {
+      for (const tplItem of itemsToImport) {
+        const isLabor = template.type === 'labor';
+        const duration = isLabor ? 1 : 1;
+        const totalCost = isLabor
+          ? tplItem.unitPrice * duration * tplItem.quantity
+          : tplItem.unitPrice * tplItem.quantity;
+
+        await createSummaryItem({
+          id: crypto.randomUUID(),
+          summaryId: id,
+          referenceId: tplItem.referenceId,
+          name: tplItem.name,
+          unit: tplItem.unit || '',
+          quantity: tplItem.quantity,
+          ...(isLabor && { duration }),
+          unitCostAtTimeOfAdding: tplItem.unitPrice,
+          totalCost,
+          createdAt: new Date().toISOString()
+        });
+      }
+    }
+    
+    setImportTemplateOpen(false);
+    setSelectedGroupTemplateId('');
+    
+    // Force recompute to bubble up costs
+    await recomputeSummaryCost(id);
+    
+    alert(`Category "${template.name}" imported with ${itemsToImport.length} items.`);
   };
 
   const handleEditSummary = async () => {
@@ -191,20 +254,37 @@ export default function SummaryWorkspace() {
             <DialogContent>
             <DialogHeader><DialogTitle>Categorize New Work</DialogTitle></DialogHeader>
             <DialogBody>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Group Classification</label>
-                <Select
-                  value={summaryType}
-                  onChange={(e) => setSummaryType(e.target.value)}
-                >
-                  <option value="material">Material Assets</option>
-                  <option value="labor">Personnel & Labor</option>
-                  <option value="bulk">Bulk / Manual Group</option>
-                </Select>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Category Title</label>
-                <Input placeholder="e.g. Site Groundworks" value={summaryName} onChange={(e) => setSummaryName(e.target.value)} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Group Classification</label>
+                  <Select
+                    value={summaryType}
+                    onChange={(e) => setSummaryType(e.target.value)}
+                  >
+                    <option value="material">Material Assets</option>
+                    <option value="labor">Personnel & Labor</option>
+                    <option value="bulk">Bulk / Manual Group</option>
+                  </Select>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Category Title</label>
+                  <Input placeholder="e.g. Site Groundworks" value={summaryName} onChange={(e) => setSummaryName(e.target.value)} />
+                </div>
+                
+                <div style={{ padding: '1rem', border: '1px dashed var(--border)', borderRadius: 'var(--radius)', backgroundColor: 'var(--secondary)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                   <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', margin: 0 }}>Quick Import from Templates</p>
+                   <select
+                    value={selectedGroupTemplateId}
+                    onChange={e => setSelectedGroupTemplateId(e.target.value)}
+                    style={{ width: '100%', height: '2.5rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', padding: '0 0.75rem', fontSize: '0.875rem', background: 'var(--background)', color: 'var(--foreground)' }}
+                   >
+                     <option value="">-- Choose template group --</option>
+                     {workGroupTemplates.map(t => (
+                       <option key={t.id} value={t.id}>{t.name} ({t.type})</option>
+                     ))}
+                   </select>
+                   <Button variant="outline" size="sm" onClick={handleImportCategory} disabled={!selectedGroupTemplateId}>Import Selected Template</Button>
+                </div>
               </div>
             </DialogBody>
             <DialogFooter>

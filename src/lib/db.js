@@ -1,7 +1,7 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'ppoms-offline-db';
-const DB_VERSION = 2; // Incremented for Index Creation
+const DB_VERSION = 5; // Incremented for Schedule-Group mapping
 
 export const ALL_STORES = [
   'campuses',
@@ -11,8 +11,12 @@ export const ALL_STORES = [
   'scheduleSummaries',
   'summaryItems',
   'materials',
-
   'laborTypes',
+  'workGroupTemplates',
+  'workGroupTemplateItems',
+  'scheduleTemplates',
+  'scheduleTemplateWorks',
+  'scheduleTemplateWorkGroups',
 ];
 
 export async function initDB() {
@@ -78,6 +82,44 @@ export async function initDB() {
 
       if (!db.objectStoreNames.contains('laborTypes')) {
         db.createObjectStore('laborTypes', { keyPath: 'id' });
+      }
+
+      if (!db.objectStoreNames.contains('workGroupTemplates')) {
+        db.createObjectStore('workGroupTemplates', { keyPath: 'id' });
+      }
+
+      let groupItemsStore;
+      if (!db.objectStoreNames.contains('workGroupTemplateItems')) {
+        groupItemsStore = db.createObjectStore('workGroupTemplateItems', { keyPath: 'id' });
+      } else {
+        groupItemsStore = transaction.objectStore('workGroupTemplateItems');
+      }
+      if (!groupItemsStore.indexNames.contains('templateId')) {
+        groupItemsStore.createIndex('templateId', 'templateId');
+      }
+
+      if (!db.objectStoreNames.contains('scheduleTemplates')) {
+        db.createObjectStore('scheduleTemplates', { keyPath: 'id' });
+      }
+
+      let templateWorksStore;
+      if (!db.objectStoreNames.contains('scheduleTemplateWorks')) {
+        templateWorksStore = db.createObjectStore('scheduleTemplateWorks', { keyPath: 'id' });
+      } else {
+        templateWorksStore = transaction.objectStore('scheduleTemplateWorks');
+      }
+      if (!templateWorksStore.indexNames.contains('templateId')) {
+        templateWorksStore.createIndex('templateId', 'templateId');
+      }
+
+      let workGroupLinksStore;
+      if (!db.objectStoreNames.contains('scheduleTemplateWorkGroups')) {
+        workGroupLinksStore = db.createObjectStore('scheduleTemplateWorkGroups', { keyPath: 'id' });
+      } else {
+        workGroupLinksStore = transaction.objectStore('scheduleTemplateWorkGroups');
+      }
+      if (!workGroupLinksStore.indexNames.contains('scheduleTemplateWorkId')) {
+        workGroupLinksStore.createIndex('scheduleTemplateWorkId', 'scheduleTemplateWorkId');
       }
       
       // syncQueue holds documents waiting to be pushed to Firebase

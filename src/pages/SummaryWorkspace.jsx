@@ -112,8 +112,8 @@ export default function SummaryWorkspace() {
   const getIcon = (type) => {
     switch (type) {
       case 'material': return <Package size={16} />;
-
       case 'labor': return <Users size={16} />;
+      case 'bulk': return <LayoutGrid size={16} />;
       default: return <Calculator size={16} />;
     }
   };
@@ -199,6 +199,7 @@ export default function SummaryWorkspace() {
                 >
                   <option value="material">Material Assets</option>
                   <option value="labor">Personnel & Labor</option>
+                  <option value="bulk">Bulk / Manual Group</option>
                 </Select>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -227,8 +228,8 @@ export default function SummaryWorkspace() {
       {summaries.map(summary => {
         const groupItems = items.filter(i => i.summaryId === summary.id);
         const showLaborState = summary.type === 'material' && summary.showLabor !== false;
-        const showToolsState = summary.showTools !== false;
-        const showOcmState = summary.showOcm !== false;
+        const showToolsState = summary.type !== 'bulk' && summary.showTools !== false;
+        const showOcmState = summary.type !== 'bulk' && summary.showOcm !== false;
         const hasAnyContainerObj = showLaborState || showToolsState || showOcmState;
         
         const totalBaseCostObj = groupItems
@@ -360,8 +361,7 @@ export default function SummaryWorkspace() {
                 onChange={(e) => setEditSummaryType(e.target.value)}
               >
                 <option value="material">Material Assets</option>
-                <option value="labor">Personnel & Labor</option>
-              </Select>
+                <option value="labor">Personnel & Labor</option>                <option value="bulk">Bulk / Manual Group</option>              </Select>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Category Title</label>
@@ -381,15 +381,39 @@ function AddItemForm({ summary, onAdd, MasterDataSelector }) {
   const [selected, setSelected] = useState(null);
   const [qty, setQty] = useState('');
   const [duration, setDuration] = useState('1');
-  const [unit, setUnit] = useState('1');
+  
+  // States for bulk / manual entry
+  const [manualName, setManualName] = useState('');
+  const [manualUnit, setManualUnit] = useState('');
+  const [manualPrice, setManualPrice] = useState('');
+
   const isLabor = summary.type === 'labor';
+  const isBulk = summary.type === 'bulk';
 
   return (
     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', backgroundColor: 'transparent', padding: '0.5rem 0 0 0', borderTop: '1px dashed var(--border)' }}>
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-        <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)' }}>SELECT ASSET</span>
-        <MasterDataSelector type={summary.type} onSelect={setSelected} selectedId={selected?.id || ''} />
-      </div>
+      {isBulk ? (
+        <>
+          <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)' }}>ITEM SPECIFICATION</span>
+            <Input placeholder="Enter description..." value={manualName} onChange={e => setManualName(e.target.value)} style={{ height: '2.5rem' }} />
+          </div>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)' }}>UNIT</span>
+            <Input placeholder="e.g. pcs, lot, sq.m" value={manualUnit} onChange={e => setManualUnit(e.target.value)} style={{ height: '2.5rem' }} />
+          </div>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)' }}>UNIT PRICE (₱)</span>
+            <Input type="number" placeholder="0.00" value={manualPrice} onChange={e => setManualPrice(e.target.value)} style={{ height: '2.5rem' }} />
+          </div>
+        </>
+      ) : (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)' }}>SELECT ASSET</span>
+          <MasterDataSelector type={summary.type} onSelect={setSelected} selectedId={selected?.id || ''} />
+        </div>
+      )}
+      
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
         <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)' }}>QTY</span>
         <Input type="number" placeholder="0" value={qty} onChange={e => setQty(e.target.value)} style={{ width: '80px', height: '2.5rem' }} />
@@ -401,7 +425,26 @@ function AddItemForm({ summary, onAdd, MasterDataSelector }) {
         </div>
       )}
       <div style={{ alignSelf: 'flex-end', paddingBottom: '2px' }}>
-        <Button size="md" onClick={() => { onAdd(selected, qty, duration); setSelected(null); setQty(''); setDuration('1'); }} disabled={!selected || !qty}>
+        <Button 
+          size="md" 
+          onClick={() => { 
+            if (isBulk) {
+              const fakeSelected = {
+                id: crypto.randomUUID(), // ephemeral pseudo-id, handled carefully by parent
+                name: manualName,
+                unit: manualUnit,
+                currentPrice: Number(manualPrice) || 0,
+                isManual: true,
+              };
+              onAdd(fakeSelected, qty, duration);
+              setManualName(''); setManualUnit(''); setManualPrice(''); setQty('');
+            } else {
+              onAdd(selected, qty, duration); 
+              setSelected(null); setQty(''); setDuration('1');
+            }
+          }} 
+          disabled={isBulk ? (!manualName || !manualPrice || !qty) : (!selected || !qty)}
+        >
           Add to Ledger
         </Button>
       </div>
@@ -415,8 +458,8 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
   const [toolsPercentage, setToolsPercentage] = useState(summary.toolsPercentage || 0);
   const [ocmPercentage, setOcmPercentage] = useState(summary.ocmPercentage || 0);
 
-  const [showTools, setShowTools] = useState(summary.showTools !== false);
-  const [showOcm, setShowOcm] = useState(summary.showOcm !== false);
+  const [showTools, setShowTools] = useState(summary.type !== 'bulk' && summary.showTools !== false);
+  const [showOcm, setShowOcm] = useState(summary.type !== 'bulk' && summary.showOcm !== false);
   const [showLaborState, setShowLaborState] = useState(summary.showLabor !== false);
 
   // Sync local state when summary prop changes (e.g. from database)
@@ -424,10 +467,10 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
     setLaborPercentage(summary.laborPercentage || 0);
     setToolsPercentage(summary.toolsPercentage || 0);
     setOcmPercentage(summary.ocmPercentage || 0);
-    setShowTools(summary.showTools !== false);
-    setShowOcm(summary.showOcm !== false);
+    setShowTools(summary.type !== 'bulk' && summary.showTools !== false);
+    setShowOcm(summary.type !== 'bulk' && summary.showOcm !== false);
     setShowLaborState(summary.showLabor !== false);
-  }, [summary.id, summary.laborPercentage, summary.toolsPercentage, summary.ocmPercentage, summary.showTools, summary.showOcm, summary.showLabor]);
+  }, [summary.id, summary.laborPercentage, summary.toolsPercentage, summary.ocmPercentage, summary.showTools, summary.showOcm, summary.showLabor, summary.type]);
 
   // Calculate costs based on summary type
   const isLaborType = summary.type === 'labor';
@@ -961,16 +1004,16 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
         </div>
       )}
       
-      {(!showLabor || !showTools || !showOcm) && (
+      {(!showLabor || !showTools || !showOcm) && summary.type !== 'bulk' && (
         <div style={{ padding: '0 1.25rem 1.25rem 1.25rem' }}>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             {summary.type === 'material' && !showLabor && (
               <Button variant="outline" size="sm" onClick={() => handleToggleContainer('labor')}>+ Add Labor Requisition</Button>
             )}
-            {!showTools && (
+            {!showTools && summary.type !== 'bulk' && (
               <Button variant="outline" size="sm" onClick={() => handleToggleContainer('tools')}>+ Add Tools & Equipment</Button>
             )}
-            {!showOcm && (
+            {!showOcm && summary.type !== 'bulk' && (
               <Button variant="outline" size="sm" onClick={() => handleToggleContainer('ocm')}>+ Add OCM</Button>
             )}
           </div>

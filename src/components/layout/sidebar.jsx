@@ -1,5 +1,6 @@
-import React, { useState, createContext, useContext } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import React, { useState, createContext, useContext, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { NavLink, useLocation, useSearchParams } from 'react-router-dom';
 import {
   Building2,
   Building,
@@ -19,6 +20,7 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../../hooks/useAuth';
+import { useCollection } from '../../hooks/useData';
 import styles from './sidebar.module.css';
 
 export const SidebarContext = createContext({ isCollapsed: false });
@@ -44,6 +46,127 @@ const masterDataItems = [
 
   { name: 'Labor Manager', path: '/labor', icon: Users },
 ];
+
+function ProjectNavItem({ item, isCollapsed }) {
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const currentScheduleId = searchParams.get('scheduleId');
+  const isWorkDetails = location.pathname.startsWith('/summary');
+
+  const { data: allSchedules } = useCollection('schedulesOfWork');
+  const currentSchedule = currentScheduleId ? allSchedules.find(s => s.id === currentScheduleId) : null;
+  const currentProjectId = currentSchedule?.projectId;
+  
+  const sortedProjectSchedules = React.useMemo(() => {
+    if (!currentProjectId) return [];
+    const schedules = allSchedules.filter(s => s.projectId === currentProjectId);
+    const roots = schedules.filter(s => !s.parentId).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    const result = [];
+    roots.forEach(root => {
+      result.push({ ...root, level: 0 });
+      const children = schedules.filter(s => s.parentId === root.id).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      children.forEach(child => {
+        result.push({ ...child, level: 1 });
+      });
+    });
+    return result;
+  }, [allSchedules, currentProjectId]);
+
+  const shouldShowPopup = isWorkDetails && currentProjectId && sortedProjectSchedules.length > 0;
+
+  // Let the user click it to go back to the project's schedule list
+  const targetPath = (isWorkDetails && currentProjectId) ? `${item.path}?projectId=${currentProjectId}` : item.path;
+  
+  // It is active if we are on its exact path, or if we are pretending it's active
+  const isActive = location.pathname.startsWith(item.path);
+
+  // If it's a dependent item, it should typically be disabled if we aren't in it. 
+  // However, while in Work Details, we enable "Program of Works" to let user navigate back or hover.
+  const isDisabled = item.type === 'dep' && !isActive && !shouldShowPopup;
+
+  const [isHovered, setIsHovered] = useState(false);
+  const containerRef = useRef(null);
+  const [popupStyle, setPopupStyle] = useState({});
+  const timeoutRef = useRef(null);
+
+  const handleMouseEnter = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setIsHovered(true);
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setPopupStyle({
+        position: 'fixed',
+        left: rect.right + 8, // 8px margin
+        top: rect.top,
+        zIndex: 9999,
+      });
+    }
+  };
+
+  const handleMouseLeave = () => {
+    timeoutRef.current = setTimeout(() => {
+      setIsHovered(false);
+    }, 150);
+  };
+
+  if (isDisabled) {
+    return (
+      <div
+        className={clsx(styles.link, styles.link_disabled)}
+        title={isCollapsed ? item.name : 'Please select a parent entity first.'}
+      >
+        <item.icon className={styles.icon} />
+        <span className={styles.linkText}>{item.name}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      className={styles.popupContainer}
+      ref={containerRef}
+      onMouseEnter={shouldShowPopup ? handleMouseEnter : undefined}
+      onMouseLeave={shouldShowPopup ? handleMouseLeave : undefined}
+    >
+      <NavLink
+        to={targetPath}
+        className={clsx(styles.link, isActive && styles.link_active)}
+        title={isCollapsed ? item.name : ''}
+      >
+        <item.icon className={styles.icon} />
+        <span className={styles.linkText}>{item.name}</span>
+      </NavLink>
+      {shouldShowPopup && isHovered && createPortal(
+        <div 
+          className={styles.popupPortaled} 
+          style={popupStyle}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
+          <div className={styles.popupTitle}>Project Schedules</div>
+          <div className={styles.popupList}>
+            {sortedProjectSchedules.map(schedule => (
+              <NavLink
+                key={schedule.id}
+                to={`/summary?scheduleId=${schedule.id}`}
+                className={clsx(styles.popupItem, schedule.id === currentScheduleId && styles.popupItemActive)}
+                style={{ paddingLeft: schedule.level > 0 ? '1.75rem' : '0.5rem', display: 'flex', alignItems: 'center' }}
+              >
+                {schedule.workCode && (
+                  <span style={{ fontSize: '0.70rem', fontWeight: 700, marginRight: '0.5rem', opacity: 0.6 }}>
+                    {schedule.workCode}
+                  </span>
+                )}
+                <span style={{ fontWeight: schedule.level === 0 ? 600 : 500 }}>{schedule.name}</span>
+              </NavLink>
+            ))}
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
 
 export function Sidebar({ className }) {
   const { signOut, user } = useAuth();
@@ -87,6 +210,10 @@ export function Sidebar({ className }) {
             <div className={styles.sectionTitle}><span>Operations</span></div>
 
             {operationsItems.map((item) => {
+              if (item.name === 'Program of Works') {
+                return <ProjectNavItem key={item.path} item={item} isCollapsed={isCollapsed} />;
+              }
+
               if (item.type === 'nav') {
                 return (
                   <NavLink

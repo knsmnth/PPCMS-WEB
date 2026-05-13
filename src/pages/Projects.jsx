@@ -103,7 +103,6 @@ export default function Projects() {
       reader.onload = async (event) => {
         try {
           await importProjectsFromJson(event.target.result, (p) => setImportProgress(p));
-          alert('Projects imported successfully.');
           refresh();
         } catch (err) {
           alert('Failed to import JSON: ' + err.message);
@@ -411,7 +410,7 @@ const handleExportExcel = async () => {
             onMouseLeave={() => {
               dataOpsTimeoutRef.current = setTimeout(() => {
                 setDataOpsOpen(false);
-              }, 2000);
+              }, 200);
             }}
           >
             <Button variant="outline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

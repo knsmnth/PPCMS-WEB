@@ -36,6 +36,15 @@ graph TD
     P --> S[Schedules of Work]
     S --> W[Summary Workspace]
     end
+
+    subgraph Dynamic Template Engine
+    ST[Schedule Templates] --> SWT[Schedule Template Works]
+    WGT[Work Group Templates] --> WGTI[Work Group Items]
+    SWT -.-> |Mapped via Join Table| WGT
+    end
+
+    ST -.-> |Import to Project| S
+    WGT -.-> |Import to Work| W
     
     subgraph Master References
     M[Materials]
@@ -101,6 +110,31 @@ sequenceDiagram
 3. **Data Chunking**: To prevent data-loss or rate-limiting during massive offline sync sessions, the queuing engine automatically slices large loads (e.g. 5,000 edits) into chunks (Batches of 500) and commits them globally in parallel.
 4. **Live Subscriptions**: When fully online, active Firestore `onSnapshot` engines stay persistent, seamlessly trickling multi-user real-time edits right back down into the local screen.
 5. **Zero-Latency Cross-Component Sync**: Using a highly-custom pub/sub DOM Event API (`localDataUpdated`), changes made in isolated modals immediately alert parallel components across the UI. This eliminates local state desync without depending on top-down prop drilling or external state management libraries!
+
+## Dynamic Template Engine
+
+PPOMS includes a high-performance, reusable template system designed to eliminate redundant manual data entry for standard project types:
+
+- **Work Group Templates**: Presets for categorized work Details. Includes standard material lists, labor crews, and bulk items. Templates can be defined as `Material`, `Labor`, or `Bulk`, with preset indirect cost percentages (OCM, Tools, Labor overheads).
+- **Schedule Templates**: Structural hierarchies for Program of Works. These allow developers to define standard project phases (e.g., "Foundation", "Structure", "Finishes") once and reuse them globally.
+- **Hierarchical Deep-Cloning**: When a Schedule Template is imported into a project:
+    1.  The system clones the multi-level work structure.
+    2.  It automatically resolves and assigns project-specific **Work Codes**.
+    3.  It fetches all associated **Work Group Templates** and their child items.
+    4.  It performs a **Bottom-Up Cost Recomputation**, ensuring the Project Total instantly reflects the cloned items' current registry prices.
+- **Project-Wide Cost Cascading**: PPOMS features a deep recomputation engine (`recomputeProjectCostsDeep`). When global project percentages (like OCM or Tools overhead) are updated in the project settings, the system automatically scans every associated work detail and category, recalculating thousands of line items to ensure financial accuracy.
+
+## Database Schema (IndexedDB V5)
+
+The local database architecture has evolved to support complex relational templates while maintaining offline performance:
+
+| Store | Purpose | Key Indices |
+| :--- | :--- | :--- |
+| `workGroupTemplates` | Master list of reusable cost categories | `id` |
+| `workGroupTemplateItems` | Individual items within a group template | `templateId` |
+| `scheduleTemplates` | Registry of Program of Works structures | `id` |
+| `scheduleTemplateWorks` | Hierarchical works within a template | `templateId`, `parentId` |
+| `scheduleTemplateWorkGroups` | Join table linking Schedule Works to Group Templates | `scheduleTemplateWorkId` |
 
 ## External API Integrations
 

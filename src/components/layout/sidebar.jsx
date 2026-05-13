@@ -87,10 +87,17 @@ function ProjectNavItem({ item, isCollapsed }) {
   // However, while in Work Details, we enable "Program of Works" to let user navigate back or hover.
   const isDisabled = item.type === 'dep' && !isActive && !shouldShowPopup;
 
-  const [isHovered, setIsHovered] = useState(false);
-  const containerRef = useRef(null);
-  const [popupStyle, setPopupStyle] = useState({});
-  const timeoutRef = useRef(null);
+   const [isHovered, setIsHovered] = useState(false);
+   const containerRef = useRef(null);
+   const [popupStyle, setPopupStyle] = useState({});
+   const timeoutRef = useRef(null);
+
+   // Reset hover state when leaving Work Details page
+   React.useEffect(() => {
+     if (!shouldShowPopup && isHovered) {
+       setIsHovered(false);
+     }
+   }, [shouldShowPopup, isHovered]);
 
   const handleMouseEnter = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);

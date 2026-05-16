@@ -8,7 +8,6 @@ import { useCollisionResolver } from './hooks/useCollisionResolver';
 import { ConnectivityBadge } from './components/ui/connectivity-badge';
 import styles from './components/layout/layout.module.css';
 
-// Pages
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Campuses from './pages/Campuses';
@@ -19,6 +18,8 @@ import SummaryWorkspace from './pages/SummaryWorkspace';
 import { MaterialsDescriptionAndPrices, LaborManager } from './pages/MasterData';
 import WorkGroupTemplatesPage from './pages/WorkGroupTemplates';
 import ScheduleTemplatesPage from './pages/ScheduleTemplates';
+import SignatureManagement from './pages/SignatureManagement';
+import CostEstimatesPrint from './pages/CostEstimatesPrint';
 import AccessDenied from './pages/AccessDenied';
 import AccessManagement from './pages/AccessManagement';
 import APIIntegrations from './pages/APIIntegrations';
@@ -58,6 +59,8 @@ function AuthenticatedApp() {
             <Route path="/labor" element={<LaborManager />} />
             <Route path="/work-group-templates" element={<WorkGroupTemplatesPage />} />
             <Route path="/schedule-templates" element={<ScheduleTemplatesPage />} />
+            <Route path="/signatures" element={<SignatureManagement />} />
+            <Route path="/print/cost-estimates" element={<CostEstimatesPrint />} />
             {user.role === 'super_admin' && (
               <>
                 <Route path="/access" element={<AccessManagement />} />

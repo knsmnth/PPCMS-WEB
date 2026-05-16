@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose, DialogBody, DialogFooter } from '../components/ui/dialog';
-import { Folder, Plus, Edit2, Trash2, Search, Copy, ChevronDown, ArrowRight, Download, Upload } from 'lucide-react';
+import { Folder, Plus, Edit2, Trash2, Search, Copy, ChevronDown, ArrowRight, Download, Upload, Printer } from 'lucide-react';
 import { cascadeDelete, cascadeDuplicateProject } from '../lib/cascade';
 import { SelectCombo } from '../components/ui/select-combo';
 import { Select } from '../components/ui/select';
@@ -701,6 +701,15 @@ const handleExportExcel = async () => {
                     </div>
                   </TableCell>
                   <TableCell style={{ textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center', height: '100%' }}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); navigate(`/print/cost-estimates?projectId=${p.id}`); }}
+                      style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.25rem' }}
+                      onMouseOver={(e) => e.currentTarget.style.color = 'var(--primary)'}
+                      onMouseOut={(e) => e.currentTarget.style.color = '#a1a1aa'}
+                      title="Print Cost Estimates"
+                    >
+                      <Printer size={16} />
+                    </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

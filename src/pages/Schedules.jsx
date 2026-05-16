@@ -12,6 +12,7 @@ import { cascadeDelete, cascadeDuplicateSchedule } from '../lib/cascade';
 import { recomputeProjectCost, recomputeScheduleCost, recomputeSummaryCost, recomputeProjectCostsDeep } from '../lib/billing'; // ground-truth recompute
 import { SelectCombo } from '../components/ui/select-combo';
 import { Layers } from 'lucide-react';
+import { extractDisplayCode } from '../lib/printUtils';
 
 // ─── Pure utility functions (no React deps) ──────────────────────────────────
 
@@ -50,11 +51,11 @@ function generateWorkCode(projectCode, parentWorkCode, siblings, currentOrder = 
     // Main schedule formatting: YY.NNN.A, YY.NNN.B
     if (!projectCode) return '';
     const prefix = `${projectCode}.`;
-    
+
     if (currentOrder !== null) {
       return `${prefix}${indexToLetter(currentOrder)}`;
     }
-    
+
     const used = siblings
       .map(w => (w.workCode || '').startsWith(prefix) ? w.workCode.slice(prefix.length) : null)
       .filter(Boolean);
@@ -137,7 +138,7 @@ function CreateWorkDialog({ open, onOpenChange, projectName, projectId, onSubmit
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
-    <DialogContent>
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Create New Work</DialogTitle>
         </DialogHeader>
@@ -194,7 +195,7 @@ function EditWorkDialog({ open, onOpenChange, work, onSubmit }) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent>
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Edit Work</DialogTitle>
         </DialogHeader>
@@ -284,7 +285,7 @@ function WorkRow({ work, isSub, expanded, onToggleExpand, hasSubs, onCreateSub, 
   return (
     <TableRow
       draggable
-      style={{ 
+      style={{
         cursor: 'pointer',
         backgroundColor: isSub ? '#fcfcfc' : 'white',
       }}
@@ -369,15 +370,15 @@ function WorkRow({ work, isSub, expanded, onToggleExpand, hasSubs, onCreateSub, 
       {/* ── Work code ── */}
       <TableCell style={{ textAlign: 'center', width: 145 }}>
         <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--foreground)', letterSpacing: '0.02em', fontFamily: 'monospace' }}>
-          {work.workCode || '—'}
+          {work.workCode ? extractDisplayCode(work.workCode) : '—'}
         </span>
       </TableCell>
 
       {/* ── Cost ── */}
-      <TableCell style={{ 
-        textAlign: 'right', 
-        width: 160, 
-        fontWeight: 700, 
+      <TableCell style={{
+        textAlign: 'right',
+        width: 160,
+        fontWeight: 700,
         color: work.isExcluded ? 'var(--muted-foreground)' : 'var(--foreground)',
         paddingRight: isSub ? '0.5rem' : '1.5rem'
       }}>
@@ -449,7 +450,7 @@ export default function ProgramOfWorks() {
   const [editOpen, setEditOpen] = useState(false);
   const [editingWork, setEditingWork] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // ── Project Defaults State ──
   const [defaultsOpen, setDefaultsOpen] = useState(false);
   const [importTemplateOpen, setImportTemplateOpen] = useState(false);
@@ -478,7 +479,7 @@ export default function ProgramOfWorks() {
       defaultOcmPercentage: Number(defaultOcm) || 0,
     });
     setDefaultsOpen(false);
-    
+
     // Deep recompute all costs in the project based on new defaults
     await recomputeProjectCostsDeep(projectId);
     refresh();
@@ -556,7 +557,7 @@ export default function ProgramOfWorks() {
     for (const tplWork of worksToCreate) {
       const newWorkId = idMap[tplWork.id];
       const linkedGroupRefs = templateWorkGroups.filter(lg => lg.scheduleTemplateWorkId === tplWork.id);
-      
+
       for (const link of linkedGroupRefs) {
         const groupTpl = workGroupTemplates.find(gt => gt.id === link.workGroupTemplateId);
         if (!groupTpl) continue;
@@ -839,13 +840,13 @@ export default function ProgramOfWorks() {
 
   const fileInputRef = useRef(null);
 
-const handleExportExcel = async () => {
-     alert('Excel export has been removed. Please use JSON export instead.');
-   };
+  const handleExportExcel = async () => {
+    alert('Excel export has been removed. Please use JSON export instead.');
+  };
 
-   const handleImportExcel = async (e) => {
-     alert('Excel import has been removed. Please use JSON import instead.');
-   };
+  const handleImportExcel = async (e) => {
+    alert('Excel import has been removed. Please use JSON import instead.');
+  };
 
   // ─── Empty / guard state ──────────────────────────────────────────────────
 

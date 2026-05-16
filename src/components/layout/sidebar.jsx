@@ -19,11 +19,13 @@ import {
   ChevronRight,
   LayoutGrid,
   Layers,
+  PenLine,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../../hooks/useAuth';
 import { useCollection } from '../../hooks/useData';
 import styles from './sidebar.module.css';
+import { extractDisplayCode } from '../../lib/printUtils';
 
 export const SidebarContext = createContext({ isCollapsed: false });
 export const useSidebar = () => useContext(SidebarContext);
@@ -48,6 +50,7 @@ const masterDataItems = [
   { name: 'Labor Manager', path: '/labor', icon: Users },
   { name: 'Work Group Templates', path: '/work-group-templates', icon: LayoutGrid },
   { name: 'Schedule Templates', path: '/schedule-templates', icon: Layers },
+  { name: 'Signature Management', path: '/signatures', icon: PenLine },
 ];
 
 function ProjectNavItem({ item, isCollapsed }) {
@@ -164,7 +167,7 @@ function ProjectNavItem({ item, isCollapsed }) {
               >
                 {schedule.workCode && (
                   <span style={{ fontSize: '0.70rem', fontWeight: 700, marginRight: '0.5rem', opacity: 0.6 }}>
-                    {schedule.workCode}
+                    {extractDisplayCode(schedule.workCode)}
                   </span>
                 )}
                 <span style={{ fontWeight: schedule.level === 0 ? 600 : 500 }}>{schedule.name}</span>

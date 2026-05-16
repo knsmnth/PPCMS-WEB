@@ -1,7 +1,7 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'ppoms-offline-db';
-const DB_VERSION = 5; // Incremented for Schedule-Group mapping
+const DB_VERSION = 7; // Incremented to trigger IDB upgrade for signatures store
 
 export const ALL_STORES = [
   'campuses',
@@ -17,6 +17,7 @@ export const ALL_STORES = [
   'scheduleTemplates',
   'scheduleTemplateWorks',
   'scheduleTemplateWorkGroups',
+  'signatures',
 ];
 
 export async function initDB() {
@@ -121,7 +122,12 @@ export async function initDB() {
       if (!workGroupLinksStore.indexNames.contains('scheduleTemplateWorkId')) {
         workGroupLinksStore.createIndex('scheduleTemplateWorkId', 'scheduleTemplateWorkId');
       }
-      
+
+      // Signature Management store
+      if (!db.objectStoreNames.contains('signatures')) {
+        db.createObjectStore('signatures', { keyPath: 'id' });
+      }
+
       // syncQueue holds documents waiting to be pushed to Firebase
       if (!db.objectStoreNames.contains('syncQueue')) {
         const queueStore = db.createObjectStore('syncQueue', { keyPath: 'id', autoIncrement: true });

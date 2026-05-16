@@ -1,7 +1,8 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useCollection } from '../hooks/useData';
 import { Printer, FileText, ArrowLeft, AlertCircle } from 'lucide-react';
+import { useReactToPrint } from 'react-to-print';
 import {
   formatNumber,
   buildHierarchicalSchedules,
@@ -21,19 +22,44 @@ const PRINT_STYLES = `
   @media print {
     /* Hide the shell completely */
     body > * { display: none !important; }
-    #cost-estimates-print-root { display: block !important; position: static !important; }
+    
+    /* Bring back the print root with fully visible overflow */
+    #cost-estimates-print-root { 
+      display: block !important; 
+      position: absolute !important; 
+      top: 0 !important; 
+      left: 0 !important; 
+      width: 100% !important; 
+      height: auto !important; 
+      overflow: visible !important; 
+      background: white !important;
+      padding: 0 !important;
+      margin: 0 !important;
+    }
     #cost-estimates-print-root .toolbar { display: none !important; }
+    
+    #print-content-wrapper {
+      display: block !important;
+      overflow: visible !important;
+      width: 100% !important;
+    }
+
     .page {
       box-shadow: none !important;
       margin: 0 !important;
+      padding: 0 !important;
       border-radius: 0 !important;
+      width: 100% !important;
+      height: auto !important;
       page-break-after: always;
     }
     .page:last-child { page-break-after: avoid; }
+    
+    table { width: 100% !important; }
     thead { display: table-header-group; }
     tfoot { display: table-footer-group; }
-    tr { page-break-inside: avoid; }
-    .row-group { page-break-inside: avoid; }
+    tr, .row-group { page-break-inside: avoid; }
+    
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
@@ -423,8 +449,8 @@ function SignatureBlock({ signatures }) {
         const sigs = signatures.filter(s => s.signatureType === type);
         if (!sigs.length) return null;
         return (
-          <div key={type} style={{ marginBottom: 20 }}>
-            <div style={{ color: '#000', marginBottom: 40, fontSize: '9pt' }}>{label}</div>
+          <div key={type} style={{ marginBottom: 16 }}>
+            <div style={{ color: '#000', marginBottom: 16, fontSize: '9pt' }}>{label}</div>
             <div style={{ display: 'flex', gap: 60, flexWrap: 'wrap' }}>
               {sigs.map(sig => (
                 <div key={sig.id} style={{ minWidth: 160 }}>
@@ -525,12 +551,17 @@ export default function CostEstimatesPrint() {
       }),
     [allSigs]);
 
-  const handlePrint = useCallback(() => window.print(), []);
-  const handleClose = useCallback(() => navigate(-1), [navigate]);
-
   const title = projects.length === 1
     ? `Cost Estimates — ${projects[0]?.name}`
     : `Cost Estimates — ${facilityCtx?.name ?? 'Multiple Projects'}`;
+  
+  const contentRef = useRef(null);
+  const handlePrint = useReactToPrint({
+    contentRef,
+    documentTitle: title,
+  });
+
+  const handleClose = useCallback(() => navigate(-1), [navigate]);
 
   // ── Full-screen overlay (covers sidebar + header in screen mode) ──
   const overlay = {
@@ -547,8 +578,6 @@ export default function CostEstimatesPrint() {
 
   return (
     <>
-      <style dangerouslySetInnerHTML={{ __html: PRINT_STYLES }} />
-
       <div id="cost-estimates-print-root" style={overlay}>
         <Toolbar title={title} onPrint={handlePrint} onClose={handleClose} />
 
@@ -568,7 +597,8 @@ export default function CostEstimatesPrint() {
             </button>
           </div>
         ) : (
-          <>
+          <div ref={contentRef} id="print-content-wrapper" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24, width: '100%' }}>
+            <style dangerouslySetInnerHTML={{ __html: PRINT_STYLES }} />
             {projects.length > 1 && (
               <SummaryPage
                 projects={projects}
@@ -591,7 +621,7 @@ export default function CostEstimatesPrint() {
                 isLast={idx === projects.length - 1}
               />
             ))}
-          </>
+          </div>
         )}
       </div>
     </>

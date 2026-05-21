@@ -45,9 +45,11 @@ export function formatNumber(value) {
  */
 export function extractDisplayCode(workCode) {
   if (!workCode) return '';
-  // Match pattern: digits.rest  →  strip "digits." prefix
-  const match = workCode.match(/^\d+\.(.+)$/);
-  return match ? match[1] : workCode;
+  const parts = workCode.split('.');
+  if (parts.length > 2) {
+    return parts.slice(2).join('.');
+  }
+  return '';
 }
 
 /**

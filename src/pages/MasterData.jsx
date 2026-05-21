@@ -85,6 +85,8 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
         headerToField[f.label] = f.name;
       });
 
+      const existingNames = new Set(data.map(d => d.name?.toString().toLowerCase().trim()).filter(Boolean));
+
       const newItems = [];
       worksheet.eachRow((row, rowNumber) => {
         if (rowNumber === 1) return;
@@ -110,8 +112,12 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
         }
         item.priceHistory = [{ price: initialPrice, date: item.createdAt }];
         
-        if (hasData) {
-          newItems.push(item);
+        if (hasData && item.name) {
+          const nameNormalized = item.name.toString().toLowerCase().trim();
+          if (!existingNames.has(nameNormalized)) {
+            newItems.push(item);
+            existingNames.add(nameNormalized);
+          }
         }
       });
 
@@ -176,6 +182,32 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
       [priceField]: newPriceNum,
       priceHistory: historyUpdates
     });
+    
+    if (newPriceNum !== currentPriceNum || selectedItem.name !== editFormData.name || selectedItem.unit !== editFormData.unit) {
+      try {
+        const { getAllFromDB, putToDB } = await import('../lib/db');
+        const { recomputeSummaryCost } = await import('../lib/billing');
+        const allItems = await getAllFromDB('summaryItems');
+        const affectedItems = allItems.filter(i => i.referenceId === selectedItem.id);
+        const updatedSummaryIds = new Set();
+        for (const item of affectedItems) {
+          const qty = item.quantity || 1;
+          const duration = item.duration || 1;
+          const isGroupLabor = item.duration !== undefined;
+          const newTotal = isGroupLabor ? (newPriceNum * duration * qty) : (newPriceNum * qty);
+          const updateObj = { ...item, unitCostAtTimeOfAdding: newPriceNum, totalCost: newTotal };
+          if (editFormData.name) updateObj.name = editFormData.name;
+          if (editFormData.unit) updateObj.unit = editFormData.unit;
+          await putToDB('summaryItems', updateObj);
+          updatedSummaryIds.add(item.summaryId);
+        }
+        for (const sId of updatedSummaryIds) {
+          await recomputeSummaryCost(sId);
+        }
+      } catch (err) {
+        console.error('Cascading updates to work details failed', err);
+      }
+    }
     
     setUpdateDialogOpen(false);
     setSelectedItem(null);

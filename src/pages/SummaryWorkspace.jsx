@@ -187,6 +187,44 @@ export default function SummaryWorkspace() {
     return summaries.reduce((sum, s) => sum + (s.totalCost || 0), 0);
   }, [summaries]);
 
+  const sortedSummaries = useMemo(() => {
+    return [...summaries].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  }, [summaries]);
+
+  const handleGroupDragStart = (e, index) => {
+    e.dataTransfer.setData('text/groupIndex', index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleGroupDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+
+    // Auto-scroll logic for drag-and-drop
+    const buffer = 100;
+    const speed = 15;
+    if (e.clientY < buffer) {
+      window.scrollBy(0, -speed);
+    } else if (window.innerHeight - e.clientY < buffer) {
+      window.scrollBy(0, speed);
+    }
+  };
+
+  const handleGroupDrop = async (e, destIndex) => {
+    e.preventDefault();
+    const srcIndexStr = e.dataTransfer.getData('text/groupIndex');
+    if (!srcIndexStr) return; // Means another drag event
+    const srcIndex = parseInt(srcIndexStr, 10);
+    if (isNaN(srcIndex) || srcIndex === destIndex) return;
+
+    const newGroups = [...sortedSummaries];
+    const [moved] = newGroups.splice(srcIndex, 1);
+    newGroups.splice(destIndex, 0, moved);
+
+    const reordered = newGroups.map((grp, idx) => ({ ...grp, order: idx }));
+    await Promise.all(reordered.map(grp => updateSummary({ id: grp.id, order: grp.order })));
+  };
+
   if (!scheduleId) {
     return (
       <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '1rem', color: 'var(--muted-foreground)' }}>
@@ -304,8 +342,11 @@ export default function SummaryWorkspace() {
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
-      {summaries.map(summary => {
+      <div 
+        style={{ display: 'flex', flexDirection: 'column', gap: '3rem', minHeight: '50vh' }}
+        onDragOver={handleGroupDragOver}
+      >
+      {sortedSummaries.map((summary, groupIndex) => {
         const groupItems = items.filter(i => i.summaryId === summary.id);
         const showLaborState = (summary.type === 'material' || summary.type === 'bulk') && summary.showLabor !== false;
         const showToolsState = summary.showTools !== false;
@@ -317,7 +358,15 @@ export default function SummaryWorkspace() {
           .reduce((sum, item) => sum + (item.totalCost || 0), 0);
         
         return (
-          <div key={summary.id} className="animate-fade-in" style={{ backgroundColor: 'var(--background)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)', overflow: 'hidden' }}>
+          <div 
+            key={summary.id} 
+            className="animate-fade-in" 
+            draggable
+            onDragStart={(e) => handleGroupDragStart(e, groupIndex)}
+            onDragOver={handleGroupDragOver}
+            onDrop={(e) => handleGroupDrop(e, groupIndex)}
+            style={{ backgroundColor: 'var(--background)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)', overflow: 'hidden', cursor: 'grab' }}
+          >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem 1.5rem', borderBottom: '2px solid var(--border)', backgroundColor: '#fafafa' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <div style={{ padding: '0.625rem', backgroundColor: 'var(--secondary)', borderRadius: '0.5rem', color: 'var(--primary)' }}>
@@ -539,6 +588,51 @@ function AddItemForm({ summary, onAdd, MasterDataSelector }) {
 
 export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem, createSummaryItem, updateSummaryItem, updateSummary, MasterDataSelector, projectContext }) {
   const parentRef = useRef(null);
+  
+  const [sortedItems, setSortedItems] = useState(groupItems);
+  
+  useEffect(() => {
+    setSortedItems([...groupItems].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)));
+  }, [groupItems]);
+
+  const handleDragStart = (e, index) => {
+    e.dataTransfer.setData('text/plain', index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+
+    // Auto-scroll logic for virtualized table drag-and-drop
+    if (!parentRef.current) return;
+    const { top, bottom } = parentRef.current.getBoundingClientRect();
+    const buffer = 50;
+    const speed = 15;
+    
+    if (e.clientY < top + buffer) {
+      parentRef.current.scrollBy(0, -speed);
+    } else if (e.clientY > bottom - buffer) {
+      parentRef.current.scrollBy(0, speed);
+    }
+  };
+
+  const handleDrop = async (e, destIndex) => {
+    e.preventDefault();
+    const srcIndexStr = e.dataTransfer.getData('text/plain');
+    if (!srcIndexStr) return;
+    const srcIndex = parseInt(srcIndexStr, 10);
+    if (isNaN(srcIndex) || srcIndex === destIndex) return;
+
+    const newItems = [...sortedItems];
+    const [moved] = newItems.splice(srcIndex, 1);
+    newItems.splice(destIndex, 0, moved);
+
+    const reordered = newItems.map((item, idx) => ({ ...item, order: idx }));
+    setSortedItems(reordered);
+    await Promise.all(reordered.map(item => updateSummaryItem({ ...item })));
+  };
+
   const [laborPercentage, setLaborPercentage] = useState(summary.laborPercentage || 0);
   const [toolsPercentage, setToolsPercentage] = useState(summary.toolsPercentage || 0);
   const [ocmPercentage, setOcmPercentage] = useState(summary.ocmPercentage || 0);
@@ -754,7 +848,7 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
   };
 
   const rowVirtualizer = useVirtualizer({
-    count: groupItems.length,
+    count: sortedItems.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 64, // estimated row height in px
     overscan: 50,
@@ -793,13 +887,17 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
             )}
 
             {virtualRows.map((virtualRow) => {
-              const item = groupItems[virtualRow.index];
+              const item = sortedItems[virtualRow.index];
               return (
                 <TableRow
                   key={item.id}
                   ref={rowVirtualizer.measureElement}
                   data-index={virtualRow.index}
-                  style={{ opacity: item.isExcluded ? 0.4 : 1, transition: 'opacity 0.2s' }}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, virtualRow.index)}
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, virtualRow.index)}
+                  style={{ opacity: item.isExcluded ? 0.4 : 1, transition: 'opacity 0.2s', cursor: 'grab' }}
                 >
                   <TableCell>
                     <div style={{ fontWeight: 700, color: 'var(--foreground)' }}>{item.name}</div>

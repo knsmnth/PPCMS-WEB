@@ -5,18 +5,20 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose, DialogBody, DialogFooter } from '../components/ui/dialog';
-import { Building, Plus, ArrowRight, ArrowLeft, Edit2, Trash2, Search } from 'lucide-react';
+import { Building, Plus, ArrowLeft, Edit2, Trash2, Search, Download, Upload, ChevronDown } from 'lucide-react';
 import { cascadeDelete } from '../lib/cascade';
 import { SelectCombo } from '../components/ui/select-combo';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { recomputeCampusCost } from '../lib/billing';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 
 export default function Facilities() {
   const [searchParams] = useSearchParams();
   const campusId = searchParams.get('campusId');
   const query = campusId ? [{ field: 'campusId', operator: '==', value: campusId }] : [];
   
-  const { data: facilities, createItem, updateItem, refresh } = useCollection('facilities', query);
+  const { data: facilities, createItem, updateItem, refresh, deleteItem } = useCollection('facilities', query);
   const { data: campuses } = useCollection('campuses');
   const campus = campuses.find(c => c.id === campusId);
   
@@ -36,13 +38,41 @@ export default function Facilities() {
   const [editCampusId, setEditCampusId] = useState('');
   
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
+
+  const handleSort = (key) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
 
   const filteredData = useMemo(() => {
-    return facilities.filter(f => 
+    let result = facilities.filter(f => 
       f.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
       (f.type && f.type.toLowerCase().includes(searchQuery.toLowerCase()))
     );
-  }, [facilities, searchQuery]);
+
+    if (sortConfig.key) {
+      result.sort((a, b) => {
+        let aValue = a[sortConfig.key] || '';
+        let bValue = b[sortConfig.key] || '';
+
+        if (sortConfig.key === 'totalCost') {
+          aValue = Number(aValue);
+          bValue = Number(bValue);
+          if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+          if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+          return 0;
+        }
+
+        const cmp = aValue.toString().localeCompare(bValue.toString(), undefined, { numeric: true, sensitivity: 'base' });
+        return sortConfig.direction === 'asc' ? cmp : -cmp;
+      });
+    }
+
+    return result;
+  }, [facilities, searchQuery, sortConfig]);
 
   const parentRef = useRef(null);
   const rowVirtualizer = useVirtualizer({
@@ -98,6 +128,111 @@ export default function Facilities() {
     refresh();
   };
 
+  const fileInputRef = useRef(null);
+
+  const handleExportExcel = async () => {
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Facilities');
+
+      worksheet.columns = [
+        { header: 'Facility Name', key: 'name', width: 25 },
+        { header: 'Facility No.', key: 'facilityNo', width: 20 },
+        { header: 'Classification', key: 'type', width: 25 },
+        { header: 'Address', key: 'address', width: 35 },
+      ];
+
+      filteredData.forEach(item => {
+        worksheet.addRow({
+          name: item.name,
+          facilityNo: item.facilityNo,
+          type: item.type,
+          address: item.address
+        });
+      });
+
+      worksheet.getRow(1).font = { bold: true };
+      
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, `Facilities_Export.xlsx`);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to export Excel.');
+    }
+  };
+
+  const handleImportExcel = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(file);
+      const worksheet = workbook.worksheets[0];
+      
+      if (!worksheet) {
+        alert("No worksheets found in the Excel file.");
+        return;
+      }
+
+      const headers = [];
+      worksheet.getRow(1).eachCell((cell, colNumber) => {
+        headers[colNumber] = cell.value;
+      });
+
+      const headerToField = {
+        'Facility Name': 'name',
+        'Facility No.': 'facilityNo',
+        'Classification': 'type',
+        'Address': 'address'
+      };
+
+      const existingFacilitiesSet = new Set(
+        facilities.map(f => `${f.name?.toString().toLowerCase().trim()}|${(f.facilityNo || '').toString().toLowerCase().trim()}`)
+      );
+
+      let newCount = 0;
+      for (let i = 2; i <= worksheet.rowCount; i++) {
+        const row = worksheet.getRow(i);
+        const item = { id: crypto.randomUUID(), campusId: selectedCampusId || campuses[0]?.id, totalCost: 0 };
+        let hasData = false;
+        
+        row.eachCell((cell, colNumber) => {
+          const header = headers[colNumber];
+          const fieldName = headerToField[header];
+          if (fieldName) {
+            item[fieldName] = cell.value?.toString() || '';
+            if (item[fieldName]) hasData = true;
+          }
+        });
+
+        if (hasData && item.name) {
+          const uniqueKey = `${item.name?.toString().toLowerCase().trim()}|${(item.facilityNo || '').toString().toLowerCase().trim()}`;
+          if (!existingFacilitiesSet.has(uniqueKey)) {
+            await createItem(item);
+            existingFacilitiesSet.add(uniqueKey);
+            newCount++;
+          }
+        }
+      }
+
+      if (newCount > 0) {
+        alert(`Successfully imported ${newCount} facilities.`);
+        refresh();
+      } else {
+        alert('No valid records found to import. Check column headers.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to import Excel file: ' + err.message);
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: 'calc(100vh - 10rem)' }}>
@@ -128,6 +263,19 @@ export default function Facilities() {
               style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', fontSize: '0.9rem', color: 'var(--foreground)' }}
             />
           </div>
+          <Button variant="outline" size="md" onClick={handleExportExcel} title="Export to Excel">
+            <Download size={18} /> Export
+          </Button>
+          <input 
+            type="file" 
+            accept=".xlsx, .xls" 
+            ref={fileInputRef} 
+            style={{ display: 'none' }} 
+            onChange={handleImportExcel} 
+          />
+          <Button variant="outline" size="md" onClick={() => fileInputRef.current?.click()} title="Import from Excel">
+            <Upload size={18} /> Import
+          </Button>
           <Dialog>
             <DialogTrigger asChild>
               <Button>
@@ -179,11 +327,36 @@ export default function Facilities() {
           <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'var(--background)' }}>
             <TableRow>
               <TableHead style={{ width: 40 }} />
-              <TableHead>Facility Identity</TableHead>
-              <TableHead>Facility No.</TableHead>
-              <TableHead>Classification</TableHead>
-              <TableHead>Address</TableHead>
-              <TableHead style={{ textAlign: 'right' }}>Cumulative Valuation</TableHead>
+              <TableHead onClick={() => handleSort('name')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  Facility Identity
+                  <ChevronDown size={14} style={{ transform: sortConfig.key === 'name' && sortConfig.direction === 'asc' ? 'rotate(180deg)' : 'none', opacity: sortConfig.key === 'name' ? 1 : 0.4 }} />
+                </div>
+              </TableHead>
+              <TableHead onClick={() => handleSort('facilityNo')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  Facility No.
+                  <ChevronDown size={14} style={{ transform: sortConfig.key === 'facilityNo' && sortConfig.direction === 'asc' ? 'rotate(180deg)' : 'none', opacity: sortConfig.key === 'facilityNo' ? 1 : 0.4 }} />
+                </div>
+              </TableHead>
+              <TableHead onClick={() => handleSort('type')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  Classification
+                  <ChevronDown size={14} style={{ transform: sortConfig.key === 'type' && sortConfig.direction === 'asc' ? 'rotate(180deg)' : 'none', opacity: sortConfig.key === 'type' ? 1 : 0.4 }} />
+                </div>
+              </TableHead>
+              <TableHead onClick={() => handleSort('address')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  Address
+                  <ChevronDown size={14} style={{ transform: sortConfig.key === 'address' && sortConfig.direction === 'asc' ? 'rotate(180deg)' : 'none', opacity: sortConfig.key === 'address' ? 1 : 0.4 }} />
+                </div>
+              </TableHead>
+              <TableHead onClick={() => handleSort('totalCost')} style={{ cursor: 'pointer', userSelect: 'none', textAlign: 'right' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'flex-end' }}>
+                  Cumulative Valuation
+                  <ChevronDown size={14} style={{ transform: sortConfig.key === 'totalCost' && sortConfig.direction === 'asc' ? 'rotate(180deg)' : 'none', opacity: sortConfig.key === 'totalCost' ? 1 : 0.4 }} />
+                </div>
+              </TableHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>

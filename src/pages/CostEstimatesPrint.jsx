@@ -10,6 +10,7 @@ import {
   computeSummaryTotals,
   computeProjectPrintTotals,
   extractDisplayCode,
+  indexToLetter,
 } from '../lib/printUtils';
 
 // ─── Injected print + screen CSS ─────────────────────────────────────────────
@@ -135,9 +136,7 @@ function ScheduleGroup({ entry, allSummaries, allItems, project, materials }) {
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
   const displayCode = extractDisplayCode(schedule.workCode);
-  const labelPrefix = displayCode
-    ? (level === 0 ? `${displayCode}` : displayCode)
-    : letterLabel;
+  const labelPrefix = letterLabel; // ALWAYS use letterLabel like A. or B. in printing as requested
 
   // ── Style tokens ──
   const schedTd = {
@@ -189,7 +188,7 @@ function ScheduleGroup({ entry, allSummaries, allItems, project, materials }) {
           .filter(i => i.summaryId === summary.id && !i.isExcluded)
           .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
-        const groupLabel = String.fromCharCode(65 + sIdx) + '.';
+        const groupLabel = indexToLetter(sIdx).toLowerCase() + '.';
 
         return (
           <React.Fragment key={summary.id}>
@@ -228,14 +227,17 @@ function ScheduleGroup({ entry, allSummaries, allItems, project, materials }) {
               };
               const ndTd = { ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden' };
               const mat = materials?.find(m => m.id === item.referenceId);
-              const displayName = mat?.description || item.name;
+              // Priority: Specs > Description > Item Name
+              const displayName = mat?.specs || mat?.description || item.name;
               return (
                 <tr key={item.id} className="row-group">
                   <td style={{ ...td, paddingLeft: level === 1 ? 32 : 24, borderLeft: 'none', borderRight: 'none' }}>
                     <span style={{ marginRight: 5 }}>{idx + 1}</span>{displayName}
                   </td>
                   <td style={{ ...td, textAlign: 'center', borderLeft: 'none', borderRight: 'none' }}>{item.quantity ?? ''}</td>
-                  <td style={{ ...td, textAlign: 'center', fontStyle: 'italic', borderLeft: 'none' }}>{item.unit ?? ''}</td>
+                  <td style={{ ...td, textAlign: 'center', fontStyle: 'italic', borderLeft: 'none' }}>
+                    {item.duration ? `${item.unit ?? ''}/(${item.duration} days)` : (item.unit ?? '')}
+                  </td>
                   <td style={ndTd}>{item.unitCostAtTimeOfAdding != null ? formatNumber(item.unitCostAtTimeOfAdding) : ''}</td>
                   <td style={ndTd}>{item.totalCost != null ? formatNumber(item.totalCost) : ''}</td>
                   {/* cols 6-10 blank */}
@@ -329,7 +331,7 @@ function ProjectPage({ project, allSchedules, allSummaries, allItems, signatures
         <div style={{ fontSize: '8.5pt', color: '#000', lineHeight: 1.5, fontWeight: 700, paddingBottom: 6, marginBottom: 8 }}>
           <div style={{ display: 'flex' }}>
             <span style={{ width: 75 }}>PROJECT:</span>
-            <span>{project.name?.toUpperCase()}</span>
+            <span>{project.name ? project.name.toUpperCase() : ''}</span>
           </div>
           {locationString && (
             <div style={{ display: 'flex' }}>

@@ -171,7 +171,7 @@ function ScheduleGroup({ entry, allSummaries, allItems, project, materials }) {
       {/* ── Schedule header row: name spans left, total at far right ── */}
       <tr className="row-group">
         <td style={{ ...schedTd, ...schedIndent, borderLeft: 'none', borderRight: 'none' }}>
-          {labelPrefix}&nbsp;{schedule.name}
+          <span style={{ display: 'inline-block', width: '16px' }}>{labelPrefix}</span>{schedule.name}
         </td>
         {/* blank cols 2-10 merged */}
         <td colSpan={9} style={{ ...schedTd, borderLeft: 'none', borderRight: 'none' }} />
@@ -194,8 +194,8 @@ function ScheduleGroup({ entry, allSummaries, allItems, project, materials }) {
           <React.Fragment key={summary.id}>
             {/* Work-group header row */}
             <tr className="row-group">
-              <td style={{ ...groupTd, paddingLeft: level === 1 ? 20 : 12, borderLeft: 'none', borderRight: 'none' }}>
-                {groupLabel}&nbsp;{summary.name}
+              <td style={{ ...groupTd, paddingLeft: level === 1 ? 40 : 24, borderLeft: 'none', borderRight: 'none' }}>
+                <span style={{ display: 'inline-block', width: '16px' }}>{groupLabel}</span>{summary.name}
               </td>
               <td style={{ ...groupTd, borderLeft: 'none', borderRight: 'none' }} />
               <td style={{ ...groupTd, borderLeft: 'none', borderRight: 'none' }} />
@@ -231,8 +231,8 @@ function ScheduleGroup({ entry, allSummaries, allItems, project, materials }) {
               const displayName = mat?.specs || mat?.description || item.name;
               return (
                 <tr key={item.id} className="row-group">
-                  <td style={{ ...td, paddingLeft: level === 1 ? 32 : 24, borderLeft: 'none', borderRight: 'none' }}>
-                    <span style={{ marginRight: 5 }}>{idx + 1}</span>{displayName}
+                  <td style={{ ...td, paddingLeft: level === 1 ? 56 : 40, borderLeft: 'none', borderRight: 'none' }}>
+                    <span style={{ display: 'inline-block', width: '16px', textAlign: 'right', marginRight: '6px' }}>{idx + 1}</span>{displayName}
                   </td>
                   <td style={{ ...td, textAlign: 'center', borderLeft: 'none', borderRight: 'none' }}>{item.quantity ?? ''}</td>
                   <td style={{ ...td, textAlign: 'center', fontStyle: 'italic', borderLeft: 'none' }}>

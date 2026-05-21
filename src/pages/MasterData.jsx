@@ -5,7 +5,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose, DialogBody, DialogFooter } from '../components/ui/dialog';
-import { Package, Plus, Trash2, Search, Info, Users, Wrench, History, Edit2, ChevronDown } from 'lucide-react';
+import { Package, Plus, Trash2, Search, Info, Users, Wrench, History, Edit2, ChevronDown, Download, Upload } from 'lucide-react';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 
 function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
   const { data, createItem, updateItem, deleteItem } = useCollection(collectionName);
@@ -32,12 +34,103 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
     }));
   };
 
-const handleExportExcel = async () => {
-     alert('Excel export has been removed. Please use JSON export instead.');
+   const handleExportExcel = async () => {
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet(title);
+
+      worksheet.columns = fields.map(f => ({ header: f.label, key: f.name, width: 25 }));
+
+      data.forEach(item => {
+        const row = {};
+        fields.forEach(f => {
+          row[f.name] = item[f.name];
+        });
+        worksheet.addRow(row);
+      });
+
+      worksheet.getRow(1).font = { bold: true };
+      
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, `${title.replace(/\\s+/g, '_')}_Export.xlsx`);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to export Excel.');
+    }
    };
 
    const handleImportExcel = async (e) => {
-     alert('Excel import has been removed. Please use JSON import instead.');
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(file);
+      const worksheet = workbook.worksheets[0];
+      
+      if (!worksheet) {
+        alert("No worksheets found in the Excel file.");
+        return;
+      }
+
+      const headerRow = worksheet.getRow(1);
+      const headers = [];
+      headerRow.eachCell((cell, colNumber) => {
+        headers[colNumber] = cell.value;
+      });
+
+      const headerToField = {};
+      fields.forEach(f => {
+        headerToField[f.label] = f.name;
+      });
+
+      const newItems = [];
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return;
+        const item = { id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+        let hasData = false;
+        row.eachCell((cell, colNumber) => {
+          const header = headers[colNumber];
+          const fieldName = headerToField[header];
+          if (fieldName) {
+            item[fieldName] = cell.value;
+            hasData = true;
+          }
+        });
+
+        let initialPrice = 0;
+        if (item.currentPrice != null) {
+          item.currentPrice = Number(item.currentPrice);
+          initialPrice = item.currentPrice;
+        }
+        if (item.currentRate != null) {
+          item.currentRate = Number(item.currentRate);
+          initialPrice = item.currentRate;
+        }
+        item.priceHistory = [{ price: initialPrice, date: item.createdAt }];
+        
+        if (hasData) {
+          newItems.push(item);
+        }
+      });
+
+      if (newItems.length > 0) {
+        for (const item of newItems) {
+          await createItem(item);
+        }
+        alert(`Successfully imported ${newItems.length} records.`);
+      } else {
+        alert('No valid records found to import. Check column headers.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to import Excel file: ' + err.message);
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
    };
 
   const handleCreate = async () => {
@@ -136,6 +229,19 @@ const handleExportExcel = async () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          <Button variant="outline" size="md" onClick={handleExportExcel} title="Export to Excel">
+            <Download size={18} /> Export
+          </Button>
+          <input 
+            type="file" 
+            accept=".xlsx, .xls" 
+            ref={fileInputRef} 
+            style={{ display: 'none' }} 
+            onChange={handleImportExcel} 
+          />
+          <Button variant="outline" size="md" onClick={() => fileInputRef.current?.click()} title="Import from Excel">
+            <Upload size={18} /> Import
+          </Button>
           <Dialog>
             <DialogTrigger asChild><Button size="md"><Plus size={18} />New Entry</Button></DialogTrigger>
             <DialogContent>

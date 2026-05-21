@@ -7,7 +7,7 @@ import {
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '../components/ui/dialog';
-import { Calendar, Plus, ArrowLeft, Edit2, Trash2, Search, GripVertical, Copy, Download, Upload, ChevronDown, ChevronRight, CornerDownRight, Settings } from 'lucide-react';
+import { Calendar, Plus, ArrowLeft, Edit2, Trash2, Search, GripVertical, Copy, Download, Upload, ChevronDown, ChevronRight, CornerDownRight, Settings, Printer } from 'lucide-react';
 import { cascadeDelete, cascadeDuplicateSchedule } from '../lib/cascade';
 import { recomputeProjectCost, recomputeScheduleCost, recomputeSummaryCost, recomputeProjectCostsDeep } from '../lib/billing'; // ground-truth recompute
 import { SelectCombo } from '../components/ui/select-combo';
@@ -253,7 +253,7 @@ function WorkGroup({ mainWork, subWorks, onDragStart, onDragOver, onDrop, onDrag
         onCreateSub={() => { setExpanded(true); onCreateSub(mainWork.id); }}
       />
 
-      {hasSubs && expanded && subWorks
+      {expanded && subWorks
         .slice()
         .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
         .map((subWork) => (
@@ -422,6 +422,8 @@ function ActionBtn({ onClick, title, children, destructive }) {
 export default function ProgramOfWorks() {
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get('projectId');
+  const facilityId = searchParams.get('facilityId');
+  const scheduleId = searchParams.get('scheduleId');
   const navigate = useNavigate();
 
   const query = useMemo(
@@ -911,6 +913,9 @@ export default function ProgramOfWorks() {
           </div>
 
           <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <Button variant="outline" onClick={() => navigate(`/print/cost-estimates?projectId=${projectId}`)} title="Print Project Cost Estimates">
+              <Printer size={18} />
+            </Button>
             <Button id="btn-project-defaults" variant="outline" onClick={handleOpenDefaults} title="Project Cost Defaults">
               <Settings size={18} />
             </Button>

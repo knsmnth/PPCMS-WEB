@@ -253,9 +253,35 @@ function ScheduleGroup({ entry, allSummaries, allItems, project, materials }) {
 }
 
 // ─── Single project print page ────────────────────────────────────────────────
-function ProjectPage({ project, allSchedules, allSummaries, allItems, signatures, facilities, campuses, materials, isLast }) {
-  const hier = buildHierarchicalSchedules(allSchedules, project.id, true);
-  const totals = computeProjectPrintTotals(project.id, allSchedules, allSummaries, allItems, project);
+function ProjectPage({ project, allSchedules, allSummaries, allItems, signatures, facilities, campuses, materials, isLast, targetScheduleId }) {
+  let hier = buildHierarchicalSchedules(allSchedules, project.id, true);
+  
+  if (targetScheduleId) {
+    const targetIdx = hier.findIndex(e => e.schedule.id === targetScheduleId);
+    if (targetIdx !== -1) {
+      const targetLevel = hier[targetIdx].level;
+      let endIdx = targetIdx + 1;
+      while (endIdx < hier.length && hier[endIdx].level > targetLevel) {
+        endIdx++;
+      }
+      hier = hier.slice(targetIdx, endIdx);
+    } else {
+      hier = [];
+    }
+  }
+
+  const zero = { materialTotal: 0, laborTotal: 0, equipmentTotal: 0, ocmTotal: 0 };
+  const totals = hier.reduce((acc, entry) => {
+    const t = computeScheduleTotals(entry.schedule, allSummaries, allItems, project);
+    return {
+      materialTotal: acc.materialTotal + t.materialTotal,
+      laborTotal: acc.laborTotal + t.laborTotal,
+      equipmentTotal: acc.equipmentTotal + t.equipmentTotal,
+      ocmTotal: acc.ocmTotal + t.ocmTotal,
+    };
+  }, zero);
+  totals.grandTotal = totals.materialTotal + totals.laborTotal + totals.equipmentTotal + totals.ocmTotal;
+  
   const displayCode = extractDisplayCode(project.projectCode || '');
 
   const facility = facilities?.find(f => f.id === project.facilityId);
@@ -518,6 +544,7 @@ export default function CostEstimatesPrint() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
+  const scheduleId = searchParams.get('scheduleId');
   const projectId = searchParams.get('projectId');
   const facilityId = searchParams.get('facilityId');
 
@@ -578,11 +605,15 @@ export default function CostEstimatesPrint() {
   const { allProjects, allSchedules, allSummaries, allItems, allSigs, facilities, campuses, materials, loading } = dbData;
 
   const projects = React.useMemo(() => {
+    if (scheduleId) {
+      const sched = allSchedules.find(s => s.id === scheduleId);
+      return sched ? allProjects.filter(p => p.id === sched.projectId) : [];
+    }
     if (projectId) return allProjects.filter(p => p.id === projectId && !p.isExcluded);
     if (facilityId === 'all') return allProjects.filter(p => !p.isExcluded).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     if (facilityId) return allProjects.filter(p => p.facilityId === facilityId && !p.isExcluded).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     return [];
-  }, [allProjects, projectId, facilityId]);
+  }, [allProjects, projectId, facilityId, scheduleId, allSchedules]);
 
   const facilityCtx = React.useMemo(() => {
     if (facilityId) return facilities.find(f => f.id === facilityId) ?? null;
@@ -651,6 +682,7 @@ export default function CostEstimatesPrint() {
           campuses={campuses}
           materials={materials}
           isLast={idx === projects.length - 1}
+          targetScheduleId={scheduleId}
         />
       ))}
     </>

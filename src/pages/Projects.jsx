@@ -121,6 +121,28 @@ export default function Projects() {
     }
   };
 
+  const handleRecalculateTotals = async () => {
+    setIsImporting(true);
+    setImportProgress(0);
+    try {
+      const targets = selectedProjectIds.size > 0 
+        ? processedData.filter(p => selectedProjectIds.has(p.id)) 
+        : processedData;
+        
+      for (let i = 0; i < targets.length; i++) {
+        await recomputeProjectCostsDeep(targets[i].id);
+        setImportProgress(Math.round(((i + 1) / targets.length) * 100));
+      }
+      refresh();
+    } catch (e) {
+      console.error(e);
+      alert("Recalculation failed: " + e.message);
+    } finally {
+      setIsImporting(false);
+      setImportProgress(0);
+    }
+  };
+
   const generateProjectCode = (existingProjects) => {
     const yearPrefix = new Date().getFullYear().toString().slice(-2);
     const thisYearProjects = existingProjects.filter(p => p.projectCode && p.projectCode.startsWith(yearPrefix + '.'));
@@ -460,26 +482,18 @@ const handleExportExcel = async () => {
                   <span style={{ fontSize: '0.65rem', color: 'var(--muted-foreground)' }}>Restore from .json file</span>
                 </div>
                </button>
-               
-               <p style={{ margin: '1rem 0.5rem 0.5rem 0.5rem', fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>Reports & Printing</p>
+
+               <p style={{ margin: '1rem 0.5rem 0.5rem 0.5rem', fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>Maintenance Tools</p>
                <button 
-                 onClick={() => {
-                   if (selectedProjectIds.size > 0) {
-                     navigate(`/print/cost-estimates?projectId=${Array.from(selectedProjectIds)[0]}`);
-                   } else if (selectedFacilityId) {
-                     navigate(`/print/cost-estimates?facilityId=${selectedFacilityId}`);
-                   } else {
-                     navigate(`/print/cost-estimates?facilityId=all`);
-                   }
-                 }}
+                 onClick={handleRecalculateTotals}
                  style={{ width: '100%', padding: '0.6rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '4px', textAlign: 'left', fontSize: '0.85rem' }}
                  onMouseOver={e => e.currentTarget.style.backgroundColor = 'var(--secondary)'}
                  onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
                >
-                 <Printer size={16} /> 
+                 <Database size={16} /> 
                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                   <span>Print Cost Estimates</span>
-                   <span style={{ fontSize: '0.65rem', color: 'var(--muted-foreground)' }}>Generate report for selection</span>
+                   <span>Recalculate Costs</span>
+                   <span style={{ fontSize: '0.65rem', color: 'var(--muted-foreground)' }}>Fix stale DB totals</span>
                  </div>
                </button>
              </div>

@@ -307,9 +307,9 @@ export default function SummaryWorkspace() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
       {summaries.map(summary => {
         const groupItems = items.filter(i => i.summaryId === summary.id);
-        const showLaborState = summary.type === 'material' && summary.showLabor !== false;
-        const showToolsState = summary.type !== 'bulk' && summary.showTools !== false;
-        const showOcmState = summary.type !== 'bulk' && summary.showOcm !== false;
+        const showLaborState = (summary.type === 'material' || summary.type === 'bulk') && summary.showLabor !== false;
+        const showToolsState = summary.showTools !== false;
+        const showOcmState = summary.showOcm !== false;
         const hasAnyContainerObj = showLaborState || showToolsState || showOcmState;
         
         const totalBaseCostObj = groupItems
@@ -504,13 +504,18 @@ function AddItemForm({ summary, onAdd, MasterDataSelector }) {
           <Input type="number" placeholder="1" value={duration} onChange={e => setDuration(e.target.value)} style={{ width: '80px', height: '2.5rem' }} />
         </div>
       )}
-      <div style={{ alignSelf: 'flex-end', paddingBottom: '2px' }}>
+      <div style={{ alignSelf: 'flex-end', paddingBottom: '2px', display: 'flex', gap: '0.5rem' }}>
+        {summary.type === 'material' && (
+          <Button size="md" variant="outline" onClick={() => alert('Import content from templates not yet fully implemented.')}>
+            Import Content
+          </Button>
+        )}
         <Button 
           size="md" 
           onClick={() => { 
             if (isBulk) {
               const fakeSelected = {
-                id: crypto.randomUUID(), // ephemeral pseudo-id, handled carefully by parent
+                id: crypto.randomUUID(),
                 name: manualName,
                 unit: manualUnit,
                 currentPrice: Number(manualPrice) || 0,
@@ -538,8 +543,8 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
   const [toolsPercentage, setToolsPercentage] = useState(summary.toolsPercentage || 0);
   const [ocmPercentage, setOcmPercentage] = useState(summary.ocmPercentage || 0);
 
-  const [showTools, setShowTools] = useState(summary.type !== 'bulk' && summary.showTools !== false);
-  const [showOcm, setShowOcm] = useState(summary.type !== 'bulk' && summary.showOcm !== false);
+  const [showTools, setShowTools] = useState(summary.showTools !== false);
+  const [showOcm, setShowOcm] = useState(summary.showOcm !== false);
   const [showLaborState, setShowLaborState] = useState(summary.showLabor !== false);
 
   // Sync local state when summary prop changes (e.g. from database)
@@ -547,15 +552,15 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
     setLaborPercentage(summary.laborPercentage || 0);
     setToolsPercentage(summary.toolsPercentage || 0);
     setOcmPercentage(summary.ocmPercentage || 0);
-    setShowTools(summary.type !== 'bulk' && summary.showTools !== false);
-    setShowOcm(summary.type !== 'bulk' && summary.showOcm !== false);
+    setShowTools(summary.showTools !== false);
+    setShowOcm(summary.showOcm !== false);
     setShowLaborState(summary.showLabor !== false);
   }, [summary.id, summary.laborPercentage, summary.toolsPercentage, summary.ocmPercentage, summary.showTools, summary.showOcm, summary.showLabor, summary.type]);
 
   // Calculate costs based on summary type
   const isLaborType = summary.type === 'labor';
 
-  const showLabor = summary.type === 'material' && showLaborState;
+  const showLabor = (summary.type === 'material' || summary.type === 'bulk') && showLaborState;
 
   // Calculate total from items (this is the "base cost" for calculations)
   // For material type: this is the material cost
@@ -930,7 +935,7 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
       {(showLabor || showTools || showOcm) && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem', borderTop: '1px solid var(--border)', paddingTop: '1.25rem', paddingLeft: '1.25rem', paddingRight: '1.25rem', paddingBottom: '1.25rem', marginBottom: '0.5rem' }}>
           {/* Labor Requisition - only show for material type */}
-          {summary.type === 'material' && showLabor && (
+          {(summary.type === 'material' || summary.type === 'bulk') && showLabor && (
             <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', backgroundColor: '#fafafa', opacity: summary.excludeLabor ? 0.6 : 1 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                 <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--foreground)', textTransform: 'uppercase', textDecoration: summary.excludeLabor ? 'line-through' : 'none', margin: 0 }}>
@@ -1084,16 +1089,16 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
         </div>
       )}
       
-      {(!showLabor || !showTools || !showOcm) && summary.type !== 'bulk' && (
+      {(!showLabor || !showTools || !showOcm) && (
         <div style={{ padding: '0 1.25rem 1.25rem 1.25rem' }}>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {summary.type === 'material' && !showLabor && (
+            {(summary.type === 'material' || summary.type === 'bulk') && !showLabor && (
               <Button variant="outline" size="sm" onClick={() => handleToggleContainer('labor')}>+ Add Labor Requisition</Button>
             )}
-            {!showTools && summary.type !== 'bulk' && (
+            {!showTools && (
               <Button variant="outline" size="sm" onClick={() => handleToggleContainer('tools')}>+ Add Tools & Equipment</Button>
             )}
-            {!showOcm && summary.type !== 'bulk' && (
+            {!showOcm && (
               <Button variant="outline" size="sm" onClick={() => handleToggleContainer('ocm')}>+ Add OCM</Button>
             )}
           </div>

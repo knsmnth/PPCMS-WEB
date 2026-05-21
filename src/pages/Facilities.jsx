@@ -23,12 +23,16 @@ export default function Facilities() {
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [type, setType] = useState('');
+  const [facilityNo, setFacilityNo] = useState('');
+  const [address, setAddress] = useState('');
   const [selectedCampusId, setSelectedCampusId] = useState(campusId || '');
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingFacility, setEditingFacility] = useState(null);
   const [editName, setEditName] = useState('');
   const [editType, setEditType] = useState('');
+  const [editFacilityNo, setEditFacilityNo] = useState('');
+  const [editAddress, setEditAddress] = useState('');
   const [editCampusId, setEditCampusId] = useState('');
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -56,9 +60,11 @@ export default function Facilities() {
   const handleCreate = async () => {
     if (!name || !selectedCampusId) return;
     const id = crypto.randomUUID();
-    await createItem({ id, campusId: selectedCampusId, name, type, totalCost: 0 });
+    await createItem({ id, campusId: selectedCampusId, name, type, facilityNo, address, totalCost: 0 });
     setName('');
     setType('');
+    setFacilityNo('');
+    setAddress('');
   };
 
   const handleEdit = async () => {
@@ -67,6 +73,8 @@ export default function Facilities() {
       ...editingFacility,
       name: editName,
       type: editType,
+      facilityNo: editFacilityNo,
+      address: editAddress,
       campusId: editCampusId
     });
     setEditDialogOpen(false);
@@ -92,8 +100,8 @@ export default function Facilities() {
 
 
   return (
-    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: 'calc(100vh - 10rem)' }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexShrink: 0 }}>
         <div>
           {campusId && (
             <button 
@@ -147,6 +155,14 @@ export default function Facilities() {
                   <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Facility Category</label>
                   <Input placeholder="e.g. Academic, Maintenance" value={type} onChange={(e) => setType(e.target.value)} />
                 </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Facility No.</label>
+                  <Input placeholder="e.g. FAC-001" value={facilityNo} onChange={(e) => setFacilityNo(e.target.value)} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Address</label>
+                  <Input placeholder="e.g. Main Street" value={address} onChange={(e) => setAddress(e.target.value)} />
+                </div>
               </DialogBody>
               <DialogFooter>
                 <DialogClose asChild>
@@ -158,13 +174,15 @@ export default function Facilities() {
         </div>
       </header>
 
-      <div ref={parentRef} style={{ maxHeight: '600px', overflow: 'auto', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
-        <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
+      <div ref={parentRef} style={{ flex: 1, minHeight: 0, overflow: 'hidden', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+        <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0, height: '100%', overflowY: 'auto' }}>
           <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'var(--background)' }}>
             <TableRow>
               <TableHead style={{ width: 40 }} />
               <TableHead>Facility Identity</TableHead>
+              <TableHead>Facility No.</TableHead>
               <TableHead>Classification</TableHead>
+              <TableHead>Address</TableHead>
               <TableHead style={{ textAlign: 'right' }}>Cumulative Valuation</TableHead>
               <TableHead></TableHead>
             </TableRow>
@@ -172,7 +190,7 @@ export default function Facilities() {
           <TableBody>
             {filteredData.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} style={{ textAlign: 'center', padding: '4rem', color: 'var(--muted-foreground)' }}>
+                <TableCell colSpan={6} style={{ textAlign: 'center', padding: '4rem', color: 'var(--muted-foreground)' }}>
                   <Building size={32} style={{ opacity: 0.2, marginBottom: '1rem' }} />
                   <p>{searchQuery ? "No facilities match your search." : "No facilities identified. Registered structures will appear here."}</p>
                 </TableCell>
@@ -181,7 +199,7 @@ export default function Facilities() {
 
             {paddingTop > 0 && (
               <tr style={{ height: `${paddingTop}px`, border: 'none' }}>
-                <td colSpan={4} style={{ padding: 0, border: 0 }}>
+                <td colSpan={6} style={{ padding: 0, border: 0 }}>
                   <div style={{ height: `${paddingTop}px` }} />
                 </td>
               </tr>
@@ -206,9 +224,15 @@ export default function Facilities() {
                   <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>UID: {f.id.substring(0, 8)}...</div>
                 </TableCell>
                 <TableCell style={{ textDecoration: f.isExcluded ? 'line-through' : 'none' }}>
+                  <div style={{ fontSize: '0.85rem', color: f.isExcluded ? 'var(--muted-foreground)' : 'var(--foreground)' }}>{f.facilityNo || '-'}</div>
+                </TableCell>
+                <TableCell style={{ textDecoration: f.isExcluded ? 'line-through' : 'none' }}>
                   <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '0.25rem 0.6rem', borderRadius: '1rem', backgroundColor: 'var(--secondary)', color: f.isExcluded ? 'var(--muted-foreground)' : 'var(--primary)', textTransform: 'uppercase' }}>
                     {f.type || 'Standard'}
                   </span>
+                </TableCell>
+                <TableCell style={{ textDecoration: f.isExcluded ? 'line-through' : 'none' }}>
+                  <div style={{ fontSize: '0.85rem', color: f.isExcluded ? 'var(--muted-foreground)' : 'var(--foreground)' }}>{f.address || '-'}</div>
                 </TableCell>
                 <TableCell style={{ textAlign: 'right', fontWeight: 700, color: f.isExcluded ? 'var(--muted-foreground)' : 'var(--foreground)', textDecoration: f.isExcluded ? 'line-through' : 'none' }}>
                   ₱{(f.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -219,6 +243,8 @@ export default function Facilities() {
                       setEditingFacility(f);
                       setEditName(f.name);
                       setEditType(f.type || '');
+                      setEditFacilityNo(f.facilityNo || '');
+                      setEditAddress(f.address || '');
                       setEditCampusId(f.campusId || '');
                       setEditDialogOpen(true);
                     }}
@@ -242,7 +268,7 @@ export default function Facilities() {
             
             {paddingBottom > 0 && (
               <tr style={{ height: `${paddingBottom}px`, border: 'none' }}>
-                <td colSpan={4} style={{ padding: 0, border: 0 }}>
+                <td colSpan={6} style={{ padding: 0, border: 0 }}>
                   <div style={{ height: `${paddingBottom}px` }} />
                 </td>
               </tr>
@@ -271,6 +297,14 @@ export default function Facilities() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Facility Category</label>
               <Input placeholder="e.g. Academic, Maintenance" value={editType} onChange={(e) => setEditType(e.target.value)} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Facility No.</label>
+              <Input placeholder="e.g. FAC-001" value={editFacilityNo} onChange={(e) => setEditFacilityNo(e.target.value)} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Address</label>
+              <Input placeholder="e.g. Main Street" value={editAddress} onChange={(e) => setEditAddress(e.target.value)} />
             </div>
           </DialogBody>
           <DialogFooter>

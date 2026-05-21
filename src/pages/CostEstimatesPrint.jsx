@@ -1,7 +1,7 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useCollection } from '../hooks/useData';
-import { Printer, FileText, ArrowLeft, AlertCircle } from 'lucide-react';
+import { getAllFromDB } from '../lib/db';
+import { Printer, FileText, ArrowLeft, AlertCircle, Loader2 } from 'lucide-react';
 import { useReactToPrint } from 'react-to-print';
 import {
   formatNumber,
@@ -72,7 +72,7 @@ const C = {
   grandTotal: '#385d22',
   grandTotalText: '#ffffff',
   itemAlt: '#ffffff',
-  border: '#000000',
+  border: '#cccccc',
   headerBg: '#ffffff',
 };
 
@@ -93,7 +93,7 @@ function Colgroup() {
 function CostTableHeader() {
   const th = {
     background: C.headerBg,
-    border: `1px solid ${C.border}`,
+    border: `0.2mm solid ${C.border}`,
     padding: '4px 5px',
     textAlign: 'center',
     fontWeight: 700,
@@ -127,7 +127,7 @@ function CostTableHeader() {
 
 // ─── Schedule group rows ──────────────────────────────────────────────────────
 // Hierarchy: Schedule (level 0/1) → Summary/Work-Group → Items
-function ScheduleGroup({ entry, allSummaries, allItems, project }) {
+function ScheduleGroup({ entry, allSummaries, allItems, project, materials }) {
   const { schedule, level, letterLabel } = entry;
   const t = computeScheduleTotals(schedule, allSummaries, allItems, project);
   const summaries = allSummaries
@@ -141,7 +141,7 @@ function ScheduleGroup({ entry, allSummaries, allItems, project }) {
 
   // ── Style tokens ──
   const schedTd = {
-    border: `1px solid ${C.border}`,
+    border: `0.2mm solid ${C.border}`,
     padding: '3px 6px',
     verticalAlign: 'middle',
     background: C.projectHeader,
@@ -153,7 +153,7 @@ function ScheduleGroup({ entry, allSummaries, allItems, project }) {
     overflow: 'hidden',
   };
   const groupTd = {
-    border: `1px solid ${C.border}`,
+    border: `0.2mm solid ${C.border}`,
     padding: '2.5px 5px',
     verticalAlign: 'middle',
     background: C.scheduleHeader,
@@ -210,13 +210,13 @@ function ScheduleGroup({ entry, allSummaries, allItems, project }) {
               {/* group total in col 10 */}
               <td style={{ ...groupNumTd }}>{st.total > 0 ? formatNumber(st.total) : ''}</td>
               {/* col 11 — no horizontal lines, left border closed */}
-              <td style={{ ...groupTd, borderTop: 'none', borderBottom: 'none', borderLeft: `1px solid ${C.border}`, borderRight: 'none', background: '#fff' }} />
+              <td style={{ ...groupTd, borderTop: 'none', borderBottom: 'none', borderLeft: `0.2mm solid ${C.border}`, borderRight: 'none', background: '#fff' }} />
             </tr>
 
             {/* Item rows */}
             {items.map((item, idx) => {
               const td = {
-                border: `1px solid #000`,
+                border: `0.2mm solid ${C.border}`,
                 padding: '2px 5px',
                 verticalAlign: 'middle',
                 background: '#fff',
@@ -227,19 +227,21 @@ function ScheduleGroup({ entry, allSummaries, allItems, project }) {
                 overflow: 'hidden',
               };
               const ndTd = { ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden' };
+              const mat = materials?.find(m => m.id === item.referenceId);
+              const displayName = mat?.description || item.name;
               return (
                 <tr key={item.id} className="row-group">
                   <td style={{ ...td, paddingLeft: level === 1 ? 32 : 24, borderLeft: 'none', borderRight: 'none' }}>
-                    <span style={{ marginRight: 5 }}>{idx + 1}</span>{item.name}
+                    <span style={{ marginRight: 5 }}>{idx + 1}</span>{displayName}
                   </td>
                   <td style={{ ...td, textAlign: 'center', borderLeft: 'none', borderRight: 'none' }}>{item.quantity ?? ''}</td>
                   <td style={{ ...td, textAlign: 'center', fontStyle: 'italic', borderLeft: 'none' }}>{item.unit ?? ''}</td>
                   <td style={ndTd}>{item.unitCostAtTimeOfAdding != null ? formatNumber(item.unitCostAtTimeOfAdding) : ''}</td>
                   <td style={ndTd}>{item.totalCost != null ? formatNumber(item.totalCost) : ''}</td>
                   {/* cols 6-10 blank */}
-                  <td colSpan={5} style={{ background: '#fff', border: '1px solid #000', borderLeft: 'none', borderRight: 'none' }} />
+                  <td colSpan={5} style={{ background: '#fff', border: `0.2mm solid ${C.border}`, borderLeft: 'none', borderRight: 'none' }} />
                   {/* col 11 — no horizontal lines, left border closed */}
-                  <td style={{ background: '#fff', borderTop: 'none', borderBottom: 'none', borderLeft: '1px solid #000', borderRight: 'none' }} />
+                  <td style={{ background: '#fff', borderTop: 'none', borderBottom: 'none', borderLeft: `0.2mm solid ${C.border}`, borderRight: 'none' }} />
                 </tr>
               );
             })}
@@ -251,7 +253,7 @@ function ScheduleGroup({ entry, allSummaries, allItems, project }) {
 }
 
 // ─── Single project print page ────────────────────────────────────────────────
-function ProjectPage({ project, allSchedules, allSummaries, allItems, signatures, facilities, campuses, isLast }) {
+function ProjectPage({ project, allSchedules, allSummaries, allItems, signatures, facilities, campuses, materials, isLast }) {
   const hier = buildHierarchicalSchedules(allSchedules, project.id, true);
   const totals = computeProjectPrintTotals(project.id, allSchedules, allSummaries, allItems, project);
   const displayCode = extractDisplayCode(project.projectCode || '');
@@ -262,7 +264,7 @@ function ProjectPage({ project, allSchedules, allSummaries, allItems, signatures
 
   // Cell helpers
   const projTd = {
-    border: `1px solid ${C.border}`,
+    border: `0.2mm solid ${C.border}`,
     padding: '4px 6px',
     background: C.projectHeader,
     fontWeight: 800,
@@ -271,7 +273,7 @@ function ProjectPage({ project, allSchedules, allSummaries, allItems, signatures
     verticalAlign: 'middle',
   };
   const grandTd = {
-    border: `1px solid ${C.grandTotal}`,
+    border: `0.2mm solid ${C.grandTotal}`,
     padding: '5px 6px',
     background: C.grandTotal,
     color: C.grandTotalText,
@@ -325,6 +327,7 @@ function ProjectPage({ project, allSchedules, allSummaries, allItems, signatures
               allSummaries={allSummaries}
               allItems={allItems}
               project={project}
+              materials={materials}
             />
           ))}
 
@@ -362,9 +365,9 @@ function SummaryPage({ projects, allSchedules, allSummaries, allItems, contextNa
     tot: acc.tot + t.grandTotal,
   }), { mat: 0, lab: 0, eqp: 0, ocm: 0, tot: 0 });
 
-  const th = { background: C.headerBg, border: `1px solid ${C.border}`, padding: '4px 6px', fontWeight: 700, fontSize: '7pt', color: '#1a3a10', textAlign: 'center' };
-  const td = (right = false) => ({ border: `1px solid #d4e8c5`, padding: '3px 6px', fontSize: '7.5pt', verticalAlign: 'middle', ...(right ? { textAlign: 'right', fontVariantNumeric: 'tabular-nums' } : {}) });
-  const ftd = { border: `1px solid ${C.grandTotal}`, padding: '4px 8px', background: C.grandTotal, color: '#fff', fontWeight: 800, fontSize: '8pt', textAlign: 'right', fontVariantNumeric: 'tabular-nums' };
+  const th = { background: C.headerBg, border: `0.2mm solid ${C.border}`, padding: '4px 6px', fontWeight: 700, fontSize: '7pt', color: '#1a3a10', textAlign: 'center' };
+  const td = (right = false) => ({ border: `0.2mm solid #d4e8c5`, padding: '3px 6px', fontSize: '7.5pt', verticalAlign: 'middle', ...(right ? { textAlign: 'right', fontVariantNumeric: 'tabular-nums' } : {}) });
+  const ftd = { border: `0.2mm solid ${C.grandTotal}`, padding: '4px 8px', background: C.grandTotal, color: '#fff', fontWeight: 800, fontSize: '8pt', textAlign: 'right', fontVariantNumeric: 'tabular-nums' };
 
   const pageStyle = {
     width: '277mm',
@@ -383,7 +386,7 @@ function SummaryPage({ projects, allSchedules, allSummaries, allItems, contextNa
           COST ESTIMATES — PROJECT SUMMARY
         </div>
         {contextName && (
-          <div style={{ fontSize: '8.5pt', color: '#000', lineHeight: 1.5, fontWeight: 700, borderBottom: '1px solid #d4d4d8', paddingBottom: 6, marginBottom: 8 }}>
+          <div style={{ fontSize: '8.5pt', color: '#000', lineHeight: 1.5, fontWeight: 700, borderBottom: '0.2mm solid #d4d4d8', paddingBottom: 6, marginBottom: 8 }}>
             <div style={{ display: 'flex' }}>
               <span style={{ width: 75 }}>FACILITY:</span>
               <span>{contextName.toUpperCase()}</span>
@@ -410,7 +413,6 @@ function SummaryPage({ projects, allSchedules, allSummaries, allItems, contextNa
           {rows.map(({ p, t }, i) => (
             <tr key={p.id} style={{ background: i % 2 === 0 ? '#fff' : C.itemAlt }}>
               <td style={{ ...td(), borderLeft: 'none' }}>
-                {extractDisplayCode(p.projectCode) && <span style={{ fontWeight: 700, marginRight: 6, color: '#385d22' }}>{extractDisplayCode(p.projectCode)}</span>}
                 <span style={{ fontWeight: 600 }}>{p.name}</span>
               </td>
               <td style={td(true)}>{formatNumber(t.materialTotal)}</td>
@@ -519,16 +521,65 @@ export default function CostEstimatesPrint() {
   const projectId = searchParams.get('projectId');
   const facilityId = searchParams.get('facilityId');
 
-  const { data: allProjects } = useCollection('projects');
-  const { data: allSchedules } = useCollection('schedulesOfWork');
-  const { data: allSummaries } = useCollection('scheduleSummaries');
-  const { data: allItems } = useCollection('summaryItems');
-  const { data: allSigs } = useCollection('signatures');
-  const { data: facilities } = useCollection('facilities');
-  const { data: campuses } = useCollection('campuses');
+  const [dbData, setDbData] = useState({
+    allProjects: [],
+    allSchedules: [],
+    allSummaries: [],
+    allItems: [],
+    allSigs: [],
+    facilities: [],
+    campuses: [],
+    materials: [],
+    loading: true
+  });
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [
+          allProjects,
+          allSchedules,
+          allSummaries,
+          allItems,
+          allSigs,
+          facilities,
+          campuses,
+          materials
+        ] = await Promise.all([
+          getAllFromDB('projects'),
+          getAllFromDB('schedulesOfWork'),
+          getAllFromDB('scheduleSummaries'),
+          getAllFromDB('summaryItems'),
+          getAllFromDB('signatures'),
+          getAllFromDB('facilities'),
+          getAllFromDB('campuses'),
+          getAllFromDB('materials')
+        ]);
+        
+        setDbData({
+          allProjects,
+          allSchedules,
+          allSummaries,
+          allItems,
+          allSigs,
+          facilities,
+          campuses,
+          materials,
+          loading: false
+        });
+      } catch (err) {
+        console.error("Failed to load print data", err);
+        setDbData(prev => ({ ...prev, loading: false }));
+      }
+    }
+    loadData();
+  }, []);
+
+  const { allProjects, allSchedules, allSummaries, allItems, allSigs, facilities, campuses, materials, loading } = dbData;
 
   const projects = React.useMemo(() => {
     if (projectId) return allProjects.filter(p => p.id === projectId && !p.isExcluded);
+    if (facilityId === 'all') return allProjects.filter(p => !p.isExcluded).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     if (facilityId) return allProjects.filter(p => p.facilityId === facilityId && !p.isExcluded).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     return [];
   }, [allProjects, projectId, facilityId]);
@@ -576,6 +627,47 @@ export default function CostEstimatesPrint() {
     gap: 24,
   };
 
+  const printContent = React.useMemo(() => (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: PRINT_STYLES }} />
+      {projects.length > 1 && (
+        <SummaryPage
+          projects={projects}
+          allSchedules={allSchedules}
+          allSummaries={allSummaries}
+          allItems={allItems}
+          contextName={facilityCtx?.name}
+        />
+      )}
+      {projects.map((project, idx) => (
+        <ProjectPage
+          key={project.id}
+          project={project}
+          allSchedules={allSchedules}
+          allSummaries={allSummaries}
+          allItems={allItems}
+          signatures={signatures}
+          facilities={facilities}
+          campuses={campuses}
+          materials={materials}
+          isLast={idx === projects.length - 1}
+        />
+      ))}
+    </>
+  ), [projects, allSchedules, allSummaries, allItems, facilityCtx, signatures, facilities, campuses, materials]);
+
+  if (loading) {
+    return (
+      <div id="cost-estimates-print-root" style={overlay}>
+        <Toolbar title={title || 'Cost Estimates'} onPrint={() => {}} onClose={handleClose} />
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: '#fff', gap: '1rem', marginTop: '15vh' }}>
+          <Loader2 size={40} className="animate-spin" style={{ color: '#16a34a' }} />
+          <div style={{ fontWeight: 600, color: '#ccc' }}>Preparing Document Data...</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div id="cost-estimates-print-root" style={overlay}>
@@ -598,29 +690,7 @@ export default function CostEstimatesPrint() {
           </div>
         ) : (
           <div ref={contentRef} id="print-content-wrapper" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24, width: '100%' }}>
-            <style dangerouslySetInnerHTML={{ __html: PRINT_STYLES }} />
-            {projects.length > 1 && (
-              <SummaryPage
-                projects={projects}
-                allSchedules={allSchedules}
-                allSummaries={allSummaries}
-                allItems={allItems}
-                contextName={facilityCtx?.name}
-              />
-            )}
-            {projects.map((project, idx) => (
-              <ProjectPage
-                key={project.id}
-                project={project}
-                allSchedules={allSchedules}
-                allSummaries={allSummaries}
-                allItems={allItems}
-                signatures={signatures}
-                facilities={facilities}
-                campuses={campuses}
-                isLast={idx === projects.length - 1}
-              />
-            ))}
+            {printContent}
           </div>
         )}
       </div>

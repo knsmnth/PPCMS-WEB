@@ -49,6 +49,7 @@ export default function Projects() {
   const [editApprovedBudget, setEditApprovedBudget] = useState('');
   const [editCampusId, setEditCampusId] = useState('');
   const [editFacilityId, setEditFacilityId] = useState('');
+  const [editProjectCode, setEditProjectCode] = useState('');
 
   const availableEditFacilities = facilities.filter(f => f.campusId === editCampusId);
 
@@ -259,7 +260,8 @@ export default function Projects() {
       priority: editPriority,
       facilityId: editFacilityId,
       totalCost: Number(editTotalCost),
-      approvedBudget: Number(editApprovedBudget)
+      approvedBudget: Number(editApprovedBudget),
+      projectCode: editProjectCode
     };
 
     if (editingProject.status !== editStatus) {
@@ -365,8 +367,8 @@ const handleExportExcel = async () => {
   };
 
   return (
-    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem', paddingBottom: '4rem' }}>
-      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: 'calc(100vh - 10rem)' }}>
+      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', flexShrink: 0 }}>
         <div>
           <h1 style={{ fontSize: '2.25rem', fontWeight: 800, color: 'var(--foreground)', letterSpacing: '-0.02em', margin: 0 }}>
             Project Overview
@@ -399,25 +401,38 @@ const handleExportExcel = async () => {
               style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', fontSize: '0.9rem', color: 'var(--foreground)' }}
             />
           </div>
-          <div className="data-ops-dropdown" style={{ position: 'relative', display: 'inline-block' }}
-            onMouseEnter={() => {
-              if (dataOpsTimeoutRef.current) {
-                clearTimeout(dataOpsTimeoutRef.current);
-                dataOpsTimeoutRef.current = null;
+            <Button variant="outline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }} onClick={() => {
+              if (selectedProjectIds.size > 0) {
+                // Not supported via URL yet, but can pass first selected or warn
+                navigate(`/print/cost-estimates?projectId=${Array.from(selectedProjectIds)[0]}`);
+              } else if (selectedFacilityId) {
+                navigate(`/print/cost-estimates?facilityId=${selectedFacilityId}`);
+              } else {
+                navigate(`/print/cost-estimates?facilityId=all`);
               }
-              setDataOpsOpen(true);
-            }}
-            onMouseLeave={() => {
-              dataOpsTimeoutRef.current = setTimeout(() => {
-                setDataOpsOpen(false);
-              }, 200);
-            }}
-          >
-            <Button variant="outline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Database size={18} />
-              <span>Data Ops</span>
-              <ChevronDown size={14} />
+            }}>
+              <Printer size={18} />
+              <span>Print</span>
             </Button>
+            <div className="data-ops-dropdown" style={{ position: 'relative', display: 'inline-block' }}
+              onMouseEnter={() => {
+                if (dataOpsTimeoutRef.current) {
+                  clearTimeout(dataOpsTimeoutRef.current);
+                  dataOpsTimeoutRef.current = null;
+                }
+                setDataOpsOpen(true);
+              }}
+              onMouseLeave={() => {
+                dataOpsTimeoutRef.current = setTimeout(() => {
+                  setDataOpsOpen(false);
+                }, 200);
+              }}
+            >
+              <Button variant="outline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Database size={18} />
+                <span>Data Ops</span>
+                <ChevronDown size={14} />
+              </Button>
             <div className="dropdown-content" style={{
               display: dataOpsOpen ? 'block' : 'none',
               position: 'absolute',
@@ -545,8 +560,8 @@ const handleExportExcel = async () => {
         </div>
       </header>
 
-      <div ref={parentRef} style={{ maxHeight: '600px', overflow: 'auto', borderRadius: 'var(--radius)', border: '1px solid var(--border)', backgroundColor: 'var(--background)' }}>
-        <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
+      <div ref={parentRef} style={{ flex: 1, minHeight: 0, overflow: 'hidden', borderRadius: 'var(--radius)', border: '1px solid var(--border)', backgroundColor: 'var(--background)' }}>
+        <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0, height: '100%', overflowY: 'auto' }}>
           <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'var(--background)', borderBottom: '1px solid var(--border)' }}>
             <TableRow>
               <TableHead style={{ width: 40 }}>
@@ -723,6 +738,7 @@ const handleExportExcel = async () => {
                         setEditFacilityId(p.facilityId || '');
                         setEditTotalCost(String(p.totalCost ?? ''));
                         setEditApprovedBudget(String(p.approvedBudget ?? ''));
+                        setEditProjectCode(p.projectCode || '');
                         setEditDialogOpen(true);
                       }}
                       style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.25rem' }}
@@ -784,6 +800,10 @@ const handleExportExcel = async () => {
                 options={availableEditFacilities.map(f => ({ value: f.id, label: f.name }))}
                 placeholder="Select facility..."
               />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Project Code</label>
+              <Input value={editProjectCode} onChange={(e) => setEditProjectCode(e.target.value)} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Project Name</label>

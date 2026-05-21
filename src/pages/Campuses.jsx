@@ -76,8 +76,8 @@ export default function Campuses() {
   };
 
   return (
-    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: 'calc(100vh - 10rem)' }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexShrink: 0 }}>
         <div>
           <h1 style={{ fontSize: '1.875rem', fontWeight: 800, color: 'var(--primary)', letterSpacing: '-0.03em' }}>Campuses</h1>
           <p style={{ color: 'var(--muted-foreground)', fontSize: '0.925rem', marginTop: '0.25rem' }}>Management and oversight of institutional regional campuses.</p>
@@ -133,8 +133,8 @@ export default function Campuses() {
         </div>
       </header>
 
-      <div ref={parentRef} style={{ maxHeight: '600px', overflow: 'auto', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
-        <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
+      <div ref={parentRef} style={{ flex: 1, minHeight: 0, overflow: 'hidden', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+        <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0, height: '100%', overflowY: 'auto' }}>
           <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'var(--background)' }}>
             <TableRow>
               <TableHead style={{ width: 40 }} />

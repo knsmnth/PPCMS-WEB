@@ -866,10 +866,10 @@ export default function ProgramOfWorks() {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: 'calc(100vh - 10rem)' }}>
 
       {/* ── Header ── */}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '1rem' }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '1rem', flexShrink: 0 }}>
         <div>
           <button
             id="btn-back-projects"
@@ -926,9 +926,9 @@ export default function ProgramOfWorks() {
       </header>
 
       {/* ── Table ── */}
-      <div style={{ borderRadius: 'var(--radius)', border: '1px solid var(--border)', overflow: 'hidden' }}>
-        <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
-          <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--background)' }}>
+      <div style={{ flex: 1, minHeight: 0, borderRadius: 'var(--radius)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+        <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0, height: '100%', overflowY: 'auto' }}>
+          <TableHeader style={{ position: 'sticky', top: 0, zIndex: 20, background: 'var(--background)', boxShadow: '0 1px 0 var(--border)' }}>
             <TableRow>
               <TableHead style={{ width: 100 }} />
               <TableHead>WORK NAME</TableHead>

@@ -138,7 +138,7 @@ export function computeSummaryTotals(summary, allItems, project) {
   const totalBaseCost = groupItems.reduce((sum, i) => sum + (i.totalCost || 0), 0);
 
   const isLaborType = summary.type === 'labor';
-  const showLabor = summary.type === 'material' && summary.showLabor !== false;
+  const showLabor = (summary.type === 'material' || summary.type === 'bulk') && summary.showLabor !== false;
   const showTools = summary.showTools !== false;
   const showOcm = summary.showOcm !== false;
 

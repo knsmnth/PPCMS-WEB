@@ -36,7 +36,7 @@ export async function recomputeSummaryCost(summaryId) {
     const project = sched ? await getFromDB('projects', sched.projectId) : null;
 
     const isLaborType = summary.type === 'labor';
-    const showLabor = summary.type === 'material' && summary.showLabor !== false;
+    const showLabor = (summary.type === 'material' || summary.type === 'bulk') && summary.showLabor !== false;
     const showTools = summary.showTools !== false;
     const showOcm = summary.showOcm !== false;
 

@@ -21,9 +21,6 @@
   background-color: #fafafa;
 }
 
-.body > tr:last-child {
-  border-bottom: 0;
-}
 
 .footer {
   border-top: 1px solid var(--border);

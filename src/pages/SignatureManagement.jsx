@@ -323,10 +323,10 @@ export default function SignatureManagement() {
   const totalEnabled = sortedSignatures.filter(s => s.isEnabled).length;
 
   return (
-    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: 'calc(100vh - 10rem)' }}>
 
       {/* ── Header ── */}
-      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', flexShrink: 0 }}>
         <div>
           <h1 style={{ fontSize: '2.25rem', fontWeight: 800, color: 'var(--foreground)', letterSpacing: '-0.02em', margin: 0 }}>
             Signature Management
@@ -345,8 +345,9 @@ export default function SignatureManagement() {
         </Button>
       </header>
 
-      {/* ── Empty state ── */}
-      {sortedSignatures.length === 0 && (
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: '0.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        {/* ── Empty state ── */}
+        {sortedSignatures.length === 0 && (
         <div style={{
           textAlign: 'center', padding: '6rem',
           backgroundColor: '#fff', borderRadius: 'var(--radius)',
@@ -405,6 +406,7 @@ export default function SignatureManagement() {
           </section>
         );
       })}
+      </div>
 
       {/* ── Create Dialog ── */}
       <Dialog open={createOpen} onOpenChange={v => { if (!v) setForm({ ...emptyForm }); setCreateOpen(v); }}>

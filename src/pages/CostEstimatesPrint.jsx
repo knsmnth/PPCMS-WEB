@@ -236,7 +236,7 @@ function ScheduleGroup({ entry, allSummaries, allItems, project, materials }) {
                   </td>
                   <td style={{ ...td, textAlign: 'center', borderLeft: 'none', borderRight: 'none' }}>{item.quantity ?? ''}</td>
                   <td style={{ ...td, textAlign: 'center', fontStyle: 'italic', borderLeft: 'none' }}>
-                    {item.duration ? `${item.unit ?? ''}/(${item.duration} days)` : (item.unit ?? '')}
+                    {item.duration ? `${item.unit ?? ''}/${item.duration} day${Number(item.duration) > 1 ? 's' : ''}` : (item.unit ?? '')}
                   </td>
                   <td style={ndTd}>{item.unitCostAtTimeOfAdding != null ? formatNumber(item.unitCostAtTimeOfAdding) : ''}</td>
                   <td style={ndTd}>{item.totalCost != null ? formatNumber(item.totalCost) : ''}</td>

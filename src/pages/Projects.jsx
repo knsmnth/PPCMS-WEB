@@ -401,19 +401,7 @@ const handleExportExcel = async () => {
               style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', fontSize: '0.9rem', color: 'var(--foreground)' }}
             />
           </div>
-            <Button variant="outline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }} onClick={() => {
-              if (selectedProjectIds.size > 0) {
-                // Not supported via URL yet, but can pass first selected or warn
-                navigate(`/print/cost-estimates?projectId=${Array.from(selectedProjectIds)[0]}`);
-              } else if (selectedFacilityId) {
-                navigate(`/print/cost-estimates?facilityId=${selectedFacilityId}`);
-              } else {
-                navigate(`/print/cost-estimates?facilityId=all`);
-              }
-            }}>
-              <Printer size={18} />
-              <span>Print</span>
-            </Button>
+
             <div className="data-ops-dropdown" style={{ position: 'relative', display: 'inline-block' }}
               onMouseEnter={() => {
                 if (dataOpsTimeoutRef.current) {
@@ -471,6 +459,28 @@ const handleExportExcel = async () => {
                   <span>Import Project JSON</span>
                   <span style={{ fontSize: '0.65rem', color: 'var(--muted-foreground)' }}>Restore from .json file</span>
                 </div>
+               </button>
+               
+               <p style={{ margin: '1rem 0.5rem 0.5rem 0.5rem', fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>Reports & Printing</p>
+               <button 
+                 onClick={() => {
+                   if (selectedProjectIds.size > 0) {
+                     navigate(`/print/cost-estimates?projectId=${Array.from(selectedProjectIds)[0]}`);
+                   } else if (selectedFacilityId) {
+                     navigate(`/print/cost-estimates?facilityId=${selectedFacilityId}`);
+                   } else {
+                     navigate(`/print/cost-estimates?facilityId=all`);
+                   }
+                 }}
+                 style={{ width: '100%', padding: '0.6rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '4px', textAlign: 'left', fontSize: '0.85rem' }}
+                 onMouseOver={e => e.currentTarget.style.backgroundColor = 'var(--secondary)'}
+                 onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
+               >
+                 <Printer size={16} /> 
+                 <div style={{ display: 'flex', flexDirection: 'column' }}>
+                   <span>Print Cost Estimates</span>
+                   <span style={{ fontSize: '0.65rem', color: 'var(--muted-foreground)' }}>Generate report for selection</span>
+                 </div>
                </button>
              </div>
            </div>

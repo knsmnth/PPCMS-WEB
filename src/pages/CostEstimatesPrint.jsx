@@ -164,14 +164,14 @@ function ScheduleGroup({ entry, allSummaries, allItems, project, materials }) {
     overflow: 'hidden',
   };
   const groupNumTd = { ...groupTd, textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden' };
-  const schedIndent = level === 1 ? { paddingLeft: 10 } : {};
+  const schedIndent = level === 1 ? { paddingLeft: 24 } : {};
 
   return (
     <>
       {/* ── Schedule header row: name spans left, total at far right ── */}
       <tr className="row-group">
         <td style={{ ...schedTd, ...schedIndent, borderLeft: 'none', borderRight: 'none' }}>
-          <span style={{ display: 'inline-block', width: '16px' }}>{labelPrefix}</span>{schedule.name}
+          <span style={{ display: 'inline-block', minWidth: '16px', paddingRight: '6px' }}>{labelPrefix}</span>{schedule.name}
         </td>
         {/* blank cols 2-10 merged */}
         <td colSpan={9} style={{ ...schedTd, borderLeft: 'none', borderRight: 'none' }} />
@@ -195,7 +195,7 @@ function ScheduleGroup({ entry, allSummaries, allItems, project, materials }) {
             {/* Work-group header row */}
             <tr className="row-group">
               <td style={{ ...groupTd, paddingLeft: level === 1 ? 40 : 24, borderLeft: 'none', borderRight: 'none' }}>
-                <span style={{ display: 'inline-block', width: '16px' }}>{groupLabel}</span>{summary.name}
+                <span style={{ display: 'inline-block', minWidth: '16px', paddingRight: '6px' }}>{groupLabel}</span>{summary.name}
               </td>
               <td style={{ ...groupTd, borderLeft: 'none', borderRight: 'none' }} />
               <td style={{ ...groupTd, borderLeft: 'none', borderRight: 'none' }} />
@@ -231,7 +231,7 @@ function ScheduleGroup({ entry, allSummaries, allItems, project, materials }) {
               const displayName = mat?.specs || mat?.description || item.name;
               return (
                 <tr key={item.id} className="row-group">
-                  <td style={{ ...td, paddingLeft: level === 1 ? 56 : 40, borderLeft: 'none', borderRight: 'none' }}>
+                  <td style={{ ...td, paddingLeft: 40, borderLeft: 'none', borderRight: 'none' }}>
                     <span style={{ display: 'inline-block', width: '16px', textAlign: 'right', marginRight: '6px' }}>{idx + 1}</span>{displayName}
                   </td>
                   <td style={{ ...td, textAlign: 'center', borderLeft: 'none', borderRight: 'none' }}>{item.quantity ?? ''}</td>

@@ -16,6 +16,7 @@ A robust, offline-first web application designed for the Visayas State Universit
 Start with the setup guide. It covers the exact Node version, Firebase project creation, environment variables, Google sign-in, Firestore rules and indexes, first-super-admin seeding, rule tests, and Netlify deployment.
 
 - [Set up PPOMS from a clean machine](docs/SETUP.md)
+- [Create a Firebase project manually](docs/TUTORIAL_MANUAL_FIREBASE.md)
 - [Migrate PPOMS to another Firebase project](docs/FIREBASE_MIGRATION.md)
 - [System and data reference](docs/SYSTEM_REFERENCE.md)
 

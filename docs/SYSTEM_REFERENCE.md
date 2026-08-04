@@ -136,6 +136,7 @@ Anonymous Firestore REST callers can read master-data documents because the rule
 ## Handoff checklist
 
 - Read [Set up PPOMS](SETUP.md) before running the application against a new project.
+- Use [the manual Firebase tutorial](TUTORIAL_MANUAL_FIREBASE.md) for a console-first project, rules, indexes, and environment setup.
 - Use [the Firebase migration guide](FIREBASE_MIGRATION.md) for project-to-project data moves.
 - Run `npm run build` and `npm run test:rules` before deploying.
 - Deploy Firestore with an explicit `--project` target.

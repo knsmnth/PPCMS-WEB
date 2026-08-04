@@ -2,6 +2,8 @@
 
 This guide takes a new maintainer from a fresh clone to a working PPOMS installation backed by a new Firebase project. Follow the steps in order. The result is a local development build, tested Firestore rules, a seeded super-admin, and a production-ready environment configuration.
 
+If you only need the Firebase Console steps for a new project, environment file, rules, and indexes, follow [Create a PPOMS Firebase project manually](TUTORIAL_MANUAL_FIREBASE.md).
+
 ## What you need
 
 - Git.
@@ -196,6 +198,6 @@ Open the error's generated index link, verify the fields match an intentional qu
 
 ## Next documents
 
+- [Manual Firebase project tutorial](TUTORIAL_MANUAL_FIREBASE.md)
 - [Firebase migration guide](FIREBASE_MIGRATION.md)
 - [System and data reference](SYSTEM_REFERENCE.md)
-

@@ -15,7 +15,7 @@ For either method, deploy the repository's Firestore configuration and configure
 
 1. Schedule a maintenance window and stop users from writing during the final copy.
 2. Record the source and destination Firebase project IDs.
-3. Create the destination project using Steps 2 through 5 of [the setup guide](SETUP.md).
+3. Create the destination project using Steps 2 through 5 of [the setup guide](SETUP.md), or follow [the manual Firebase project tutorial](TUTORIAL_MANUAL_FIREBASE.md).
 4. Deploy `firestore.rules` and `firestore.indexes.json` to the destination.
 5. Keep source and destination `.env.local` files outside Git. Label them clearly.
 6. Use separate browser profiles for source and destination. PPOMS uses the same IndexedDB name in every environment.

@@ -7,9 +7,25 @@ A robust, offline-first web application designed for the Visayas State Universit
 - **Comprehensive Project Management**: Track operations across multiple campuses, facilities, and projects in a hierarchical structure.
 - **Offline-First Data Architecture**: Work seamlessly without an internet connection utilizing optimistic UI updates and local browser storage.
 - **Real-Time Collaboration**: Changes synchronize instantly for all users via Firebase's real-time publish-subscribe engine whenever the system is online.
-- **Master Data Center**: Manage and categorize Materials (Catalogs), Equipment, and Labor Resources centrally to be utilized across numerous projects.
+- **Master Data Center**: Manage and categorize materials and labor resources centrally for use across projects.
 - **Role-Based Access Control (RBAC)**: Enforced security models protecting administration routes, distinctly dividing `admin` and `super_admin` access levels.
 - **Progressive Web App (PWA)**: Completely installable as a standalone application on desktop or mobile environments for a native-like experience.
+
+## Setup and maintainer documentation
+
+Start with the setup guide. It covers the exact Node version, Firebase project creation, environment variables, Google sign-in, Firestore rules and indexes, first-super-admin seeding, rule tests, and Netlify deployment.
+
+- [Set up PPOMS from a clean machine](docs/SETUP.md)
+- [Migrate PPOMS to another Firebase project](docs/FIREBASE_MIGRATION.md)
+- [System and data reference](docs/SYSTEM_REFERENCE.md)
+
+Quick local check after creating `.env.local` from `.env.example`:
+
+```bash
+npm ci
+npm run build
+npm run dev
+```
 
 ## System Structure
 
@@ -48,12 +64,10 @@ graph TD
     
     subgraph Master References
     M[Materials]
-    E[Equipment]
     L[Labor]
     end
     
     W -.-> M
-    W -.-> E
     W -.-> L
 ```
 
@@ -124,7 +138,7 @@ PPOMS includes a high-performance, reusable template system designed to eliminat
     4.  It performs a **Bottom-Up Cost Recomputation**, ensuring the Project Total instantly reflects the cloned items' current registry prices.
 - **Project-Wide Cost Cascading**: PPOMS features a deep recomputation engine (`recomputeProjectCostsDeep`). When global project percentages (like OCM or Tools overhead) are updated in the project settings, the system automatically scans every associated work detail and category, recalculating thousands of line items to ensure financial accuracy.
 
-## Database Schema (IndexedDB V5)
+## Database Schema (IndexedDB V7)
 
 The local database architecture has evolved to support complex relational templates while maintaining offline performance:
 
@@ -153,13 +167,12 @@ graph LR
     end
 
     AS -- "HTTP GET (Materials)" --> MD
-    IS -- "HTTP GET (Equipment)" --> MD
     SIS -- "HTTP GET (Labor Types)" --> MD
     
     style MD fill:#4ade80,stroke:#0d1711,stroke-width:2px,color:#0d1711
 ```
 
-By safely segregating Master Data rules structurally, external administrative systems can silently consume the live PPOMS pricing references. Developers across the university can pull JSON structures for `Materials`, `Equipments`, and `Labor Rates` via direct REST queries. This ensures PPOMS remains the singular source-of-truth for construction-level prices without bogging down databases with custom REST translation layers!
+By segregating master-data rules structurally, external systems can consume the live PPOMS material and labor pricing references through Firestore's REST API. These collections are intentionally public-readable; review that policy in the [system reference](docs/SYSTEM_REFERENCE.md#authorization-model) before every production deployment.
 
 ## Scalability
 

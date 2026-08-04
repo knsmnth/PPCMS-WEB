@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { auth, googleProvider, db } from '../lib/firebase';
 import { signInWithPopup, onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
-import { doc, getDoc, setDoc, getDocs, collection, query, limit } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 export function useAuth() {
   const [user, setUser] = useState(null);
@@ -50,32 +50,11 @@ export function useAuth() {
             
             setUser({ ...currentUser, role: userData.role });
           } else {
-            // Check if this is the very first user (bootstrapping)
-            const usersRef = collection(db, 'users');
-            const q = query(usersRef, limit(1));
-            const querySnapshot = await getDocs(q);
-            
-            if (querySnapshot.empty) {
-              // Create the first super_admin
-              const initialData = {
-                email: emailKey,
-                role: 'super_admin',
-                uid: currentUser.uid,
-                displayName: currentUser.displayName,
-                photoURL: currentUser.photoURL,
-                createdAt: new Date().toISOString(),
-                lastLogin: new Date().toISOString()
-              };
-              await setDoc(userDocRef, initialData);
-              setRole('super_admin');
-              localStorage.setItem(`auth_role_${emailKey}`, 'super_admin');
-              setUser({ ...currentUser, role: 'super_admin' });
-            } else {
-              // User not authorized
-              setRole('none');
-              localStorage.removeItem(`auth_role_${emailKey}`);
-              setUser({ ...currentUser, role: 'none' });
-            }
+            // Access is deny-by-default. A super-admin record must be seeded
+            // during setup, then additional users are managed in the app.
+            setRole('none');
+            localStorage.removeItem(`auth_role_${emailKey}`);
+            setUser({ ...currentUser, role: 'none' });
           }
         } catch (error) {
           console.error("Error fetching user role:", error);

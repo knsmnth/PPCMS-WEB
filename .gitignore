@@ -12,6 +12,14 @@ dist
 dist-ssr
 *.local
 
+# Firebase project selection is local to each deployment target. Copy the
+# committed template and never bind a handoff clone to the original project.
+.firebaserc
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

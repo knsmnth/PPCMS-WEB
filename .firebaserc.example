@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "dev": "replace-with-development-project-id",
+    "prod": "replace-with-production-project-id"
+  }
+}

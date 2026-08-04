@@ -1,64 +1,110 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper to check if a user is signed in
-    function isAuth() {
+    function isSignedIn() {
       return request.auth != null;
     }
 
-    // Helper to get the signed-in user's email safely
+    function hasEmail() {
+      return isSignedIn() && request.auth.token.email is string;
+    }
+
     function userEmail() {
       return request.auth.token.email.lower();
     }
 
-    // Check if the current user has explicitly been granted access
+    function isSelf(emailId) {
+      return hasEmail() && emailId == userEmail();
+    }
+
+    function hasRole(role) {
+      return hasEmail()
+        && exists(/databases/$(database)/documents/users/$(userEmail()))
+        && get(/databases/$(database)/documents/users/$(userEmail())).data.role == role;
+    }
+
     function hasActiveRole() {
-      let role = get(/databases/$(database)/documents/users/$(userEmail())).data.role;
-      return role == 'admin' || role == 'super_admin';
+      return hasRole('admin') || hasRole('super_admin');
     }
 
-    // Check if the current user is specifically a super_admin
     function isSuperAdmin() {
-      return get(/databases/$(database)/documents/users/$(userEmail())).data.role == 'super_admin';
+      return hasRole('super_admin');
     }
 
-    // 1. Users Collection (Role Management)
+    function hasValidManagedUserFields(emailId) {
+      return request.resource.data.keys().hasAll(['email', 'role'])
+        && request.resource.data.keys().hasOnly([
+          'email', 'role', 'uid', 'displayName', 'photoURL', 'createdAt', 'lastLogin'
+        ])
+        && request.resource.data.email == emailId
+        && request.resource.data.role in ['admin', 'super_admin'];
+    }
+
+    function changesOnlyOwnProfileFields() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'uid', 'displayName', 'photoURL', 'lastLogin'
+      ]);
+    }
+
+    function isOperationalCollection(collectionName) {
+      return collectionName in [
+        'campuses',
+        'facilities',
+        'projects',
+        'schedulesOfWork',
+        'scheduleSummaries',
+        'summaryItems',
+        'workGroupTemplates',
+        'workGroupTemplateItems',
+        'scheduleTemplates',
+        'scheduleTemplateWorks',
+        'scheduleTemplateWorkGroups',
+        'signatures'
+      ];
+    }
+
+    // Role records are keyed by lowercase email address. The first super-admin
+    // must be seeded out-of-band as described in docs/SETUP.md.
     match /users/{emailId} {
-      // Anyone signed in needs to be able to read this collection to verify their role/bootstrap
-      allow read: if isAuth();
-      
-      // Super admins have full control over the users collection
-      allow write, delete: if isAuth() && isSuperAdmin();
-      
-      // Users can update their own document to refresh their `lastLogin`, `uid`, and `photoURL`
-      // They are explicitly DENIED from modifying their own `role`
-      allow update: if isAuth() && emailId == userEmail() 
-                    && request.resource.data.role == resource.data.role;
-                    
-      // Allow the very first user to assign themselves via bootstrapping 
-      allow create: if isAuth() && emailId == userEmail();
+      allow get: if isSelf(emailId) || isSuperAdmin();
+      allow list: if isSuperAdmin();
+
+      allow create: if isSuperAdmin() && hasValidManagedUserFields(emailId);
+
+      allow update: if (
+        isSuperAdmin()
+        && !isSelf(emailId)
+        && hasValidManagedUserFields(emailId)
+      ) || (
+        isSelf(emailId)
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.email == resource.data.email
+        && changesOnlyOwnProfileFields()
+      );
+
+      // Prevent a super-admin from accidentally removing their own access.
+      allow delete: if isSuperAdmin() && !isSelf(emailId);
     }
 
-    // 3. API Integrations (Public Read for Master Data)
-    // Allows external sibling systems to query our equipment, labor, and materials
+    // Public master-data endpoints used by external university systems.
     match /materials/{document=**} {
       allow read: if true;
-      allow write: if isAuth() && hasActiveRole();
-    }
-    match /equipments/{document=**} {
-      allow read: if true;
-      allow write: if isAuth() && hasActiveRole();
-    }
-    match /laborTypes/{document=**} {
-      allow read: if true;
-      allow write: if isAuth() && hasActiveRole();
+      allow write: if hasActiveRole();
     }
 
-    // 4. Application Data Collections (Everything Else)
-    // Valid roles can read and write all operational data
-    match /{document=**} {
-      allow read, write: if isAuth() && hasActiveRole();
+    match /equipments/{document=**} {
+      allow read: if true;
+      allow write: if hasActiveRole();
+    }
+
+    match /laborTypes/{document=**} {
+      allow read: if true;
+      allow write: if hasActiveRole();
+    }
+
+    // Explicit allowlist prevents this rule from overlapping /users.
+    match /{collectionName}/{document=**} {
+      allow read, write: if isOperationalCollection(collectionName) && hasActiveRole();
     }
   }
 }

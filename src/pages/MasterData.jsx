@@ -185,7 +185,7 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
     
     if (newPriceNum !== currentPriceNum || selectedItem.name !== editFormData.name || selectedItem.unit !== editFormData.unit) {
       try {
-        const { getAllFromDB, putToDB } = await import('../lib/db');
+        const { getAllFromDB, putToDB, addToSyncQueue } = await import('../lib/db');
         const { recomputeSummaryCost } = await import('../lib/billing');
         const allItems = await getAllFromDB('summaryItems');
         const affectedItems = allItems.filter(i => i.referenceId === selectedItem.id);
@@ -195,11 +195,22 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
           const duration = item.duration || 1;
           const isGroupLabor = item.duration !== undefined;
           const newTotal = isGroupLabor ? (newPriceNum * duration * qty) : (newPriceNum * qty);
-          const updateObj = { ...item, unitCostAtTimeOfAdding: newPriceNum, totalCost: newTotal };
+          const updateObj = { 
+            ...item, 
+            unitCost: newPriceNum,
+            unitCostAtTimeOfAdding: newPriceNum, 
+            totalCost: newTotal,
+            updatedAt: new Date().toISOString()
+          };
           if (editFormData.name) updateObj.name = editFormData.name;
           if (editFormData.unit) updateObj.unit = editFormData.unit;
           await putToDB('summaryItems', updateObj);
+          await addToSyncQueue({ type: 'update', collection: 'summaryItems', payload: updateObj });
           updatedSummaryIds.add(item.summaryId);
+        }
+        if (affectedItems.length > 0) {
+          window.dispatchEvent(new CustomEvent('localDataUpdated', { detail: 'summaryItems' }));
+          window.dispatchEvent(new Event('triggerSync'));
         }
         for (const sId of updatedSummaryIds) {
           await recomputeSummaryCost(sId);

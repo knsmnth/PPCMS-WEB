@@ -160,17 +160,84 @@ export async function recomputeProjectCostsDeep(projectId) {
     const projectSchedules = allSchedules.filter(s => s.projectId === projectId);
     
     const allSummaries = await getAllFromDB('scheduleSummaries');
-    const projectSummaryIds = allSummaries
-      .filter(s => projectSchedules.some(ps => ps.id === s.scheduleOfWorkId))
-      .map(s => s.id);
+    const projectSummaries = allSummaries.filter(s => projectSchedules.some(ps => ps.id === s.scheduleOfWorkId));
+    const projectSummaryIds = projectSummaries.map(s => s.id);
 
-    // 1. Recompute all summaries (this will bubble up to works and eventually the project)
-    // We do this sequentially to avoid IDB transaction collisions and ensure proper bubbling
+    // ─── 1. Global Catalog Price Synchronisation ───
+    const [materials, laborTypes] = await Promise.all([
+      getAllFromDB('materials'),
+      getAllFromDB('laborTypes')
+    ]);
+
+    // Build in-memory lookup maps for quick access
+    const materialsMap = new Map();
+    for (const m of materials) {
+      if (m.id) materialsMap.set(m.id, m);
+      if (m.itemCode) materialsMap.set(m.itemCode, m);
+    }
+
+    const laborTypesMap = new Map();
+    for (const l of laborTypes) {
+      if (l.id) laborTypesMap.set(l.id, l);
+      if (l.name) laborTypesMap.set(l.name.toLowerCase().trim(), l);
+    }
+
+    const allItems = await getAllFromDB('summaryItems');
+    const projectItems = allItems.filter(i => projectSummaryIds.includes(i.summaryId));
+    let itemsUpdated = false;
+
+    for (const item of projectItems) {
+      const summary = projectSummaries.find(s => s.id === item.summaryId);
+      if (!summary) continue;
+
+      let latestPrice = null;
+      if (summary.type === 'labor') {
+        const match = laborTypesMap.get(item.referenceId) || (item.name ? laborTypesMap.get(item.name.toLowerCase().trim()) : null);
+        if (match) {
+          latestPrice = Number(match.currentRate) || 0;
+        }
+      } else {
+        const match = materialsMap.get(item.referenceId) || (item.itemCode ? materialsMap.get(item.itemCode) : null);
+        if (match) {
+          latestPrice = Number(match.currentPrice) || 0;
+        }
+      }
+
+      if (latestPrice !== null) {
+        const currentPrice = Number(item.unitCostAtTimeOfAdding) || Number(item.unitCost) || 0;
+        if (Math.abs(latestPrice - currentPrice) > 0.001) {
+          const qty = Number(item.quantity) || 0;
+          const duration = Number(item.duration) || 1;
+          const isLabor = summary.type === 'labor';
+          const newTotalCost = isLabor ? latestPrice * duration * qty : latestPrice * qty;
+
+          const updatedItem = {
+            ...item,
+            unitCost: latestPrice,
+            unitCostAtTimeOfAdding: latestPrice,
+            totalCost: newTotalCost,
+            updatedAt: new Date().toISOString()
+          };
+
+          await putToDB('summaryItems', updatedItem);
+          await addToSyncQueue({ type: 'update', collection: 'summaryItems', payload: updatedItem });
+          itemsUpdated = true;
+        }
+      }
+    }
+
+    if (itemsUpdated) {
+      notifyUpdate('summaryItems');
+      triggerSync();
+    }
+
+    // ─── 2. Bubbling & Cost Recomputation ───
+    // Recompute all summaries sequentially to avoid IndexedDB collisions and ensure proper bubbling
     for (const sId of projectSummaryIds) {
       await recomputeSummaryCost(sId);
     }
 
-    // 2. Final project total check (in case there are works without summaries but with sub-schedules)
+    // Final project total check (in case there are works without summaries but with sub-schedules)
     await recomputeProjectCost(projectId);
   } catch (err) {
     console.error('[Billing] recomputeProjectCostsDeep failed:', err);

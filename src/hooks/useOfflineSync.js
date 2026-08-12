@@ -5,57 +5,84 @@ import { writeBatch, doc } from 'firebase/firestore';
 
 export function useOfflineSync() {
   useEffect(() => {
+    let isSyncing = false;
+    let syncNeeded = false;
+
     const syncData = async () => {
       if (!navigator.onLine) return;
+      if (isSyncing) {
+        syncNeeded = true;
+        return;
+      }
+      isSyncing = true;
+      syncNeeded = false;
       
       try {
-        const queue = await getSyncQueue();
-        if (!queue || queue.length === 0) return;
+        let hasMore = true;
+        while (hasMore) {
+          const queue = await getSyncQueue();
+          if (!queue || queue.length === 0) {
+            hasMore = false;
+            break;
+          }
 
-        // Offline Sync Processor - Bypassing 500-document batch limit
-        console.log(`[Offline Sync] Pushing ${queue.length} items to Firebase...`);
-        
-        const MAX_BATCH_SIZE = 500;
-        const batches = [];
-        let currentBatch = writeBatch(db);
-        let operationCount = 0;
-
-        // Loop through all pending operations and chunk them
-        for (const operation of queue) {
-          const docRef = doc(db, operation.collection, operation.payload.id);
+          // Offline Sync Processor - Bypassing 500-document batch limit
+          console.log(`[Offline Sync] Pushing ${queue.length} items to Firebase...`);
           
-          if (operation.type === 'create' || operation.type === 'update') {
-            currentBatch.set(docRef, operation.payload, { merge: true });
-          } else if (operation.type === 'delete') {
-            currentBatch.delete(docRef);
+          const MAX_BATCH_SIZE = 500;
+          const batches = [];
+          let currentBatch = writeBatch(db);
+          let operationCount = 0;
+
+          // Loop through all pending operations and chunk them
+          for (const operation of queue) {
+            const docRef = doc(db, operation.collection, operation.payload.id);
+            
+            if (operation.type === 'create' || operation.type === 'update') {
+              currentBatch.set(docRef, operation.payload, { merge: true });
+            } else if (operation.type === 'delete') {
+              currentBatch.delete(docRef);
+            }
+            
+            operationCount++;
+            
+            // If we hit 500, push the batch and start a new one
+            if (operationCount === MAX_BATCH_SIZE) {
+              batches.push(currentBatch);
+              currentBatch = writeBatch(db);
+              operationCount = 0;
+            }
           }
           
-          operationCount++;
-          
-          // If we hit 500, push the batch and start a new one
-          if (operationCount === MAX_BATCH_SIZE) {
+          // Push any remaining operations
+          if (operationCount > 0) {
             batches.push(currentBatch);
-            currentBatch = writeBatch(db);
-            operationCount = 0;
+          }
+          
+          // Commit all batches in parallel
+          await Promise.all(batches.map(b => b.commit()));
+          
+          // If successful, clear the processed items from IndexedDB SyncQueue
+          // (Removing sequentially is fine for IndexedDB, it is fast locally)
+          for (const operation of queue) {
+            await removeFromSyncQueue(operation.id);
+          }
+          console.log('[Offline Sync] Sync successful across', batches.length, 'batch(es)');
+
+          // Check if another sync request was queued during our run, or scan the queue again to make sure it is empty
+          if (!syncNeeded) {
+            const freshQueue = await getSyncQueue();
+            if (freshQueue.length === 0) {
+              hasMore = false;
+            }
+          } else {
+            syncNeeded = false;
           }
         }
-        
-        // Push any remaining operations
-        if (operationCount > 0) {
-          batches.push(currentBatch);
-        }
-        
-        // Commit all batches in parallel
-        await Promise.all(batches.map(b => b.commit()));
-        
-        // If successful, clear the processed items from IndexedDB SyncQueue
-        // (Removing sequentially is fine for IndexedDB, it is fast locally)
-        for (const operation of queue) {
-          await removeFromSyncQueue(operation.id);
-        }
-        console.log('[Offline Sync] Sync successful across', batches.length, 'batch(es)');
       } catch (error) {
         console.error('[Offline Sync] Background sync failed:', error);
+      } finally {
+        isSyncing = false;
       }
     };
 

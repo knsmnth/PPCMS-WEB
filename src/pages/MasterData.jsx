@@ -74,60 +74,189 @@ function MasterDataManager({ collectionName, title, fields, icon: Icon }) {
         return;
       }
 
+      const normalizeHeader = (str) => {
+        if (!str) return '';
+        return str.toString()
+          .toLowerCase()
+          .replace(/\s+/g, '')                  // Remove all whitespace
+          .replace(/\([^)]*\)/g, '')            // Remove anything inside parentheses like (₱)
+          .replace(/[^a-z0-9]/g, '')            // Remove special characters
+          .replace(/specifications?$/, 'spec'); // Normalize specification/specifications to spec
+      };
+
       const headerRow = worksheet.getRow(1);
       const headers = [];
       headerRow.eachCell((cell, colNumber) => {
-        headers[colNumber] = cell.value;
+        headers[colNumber] = normalizeHeader(cell.value);
       });
 
       const headerToField = {};
       fields.forEach(f => {
-        headerToField[f.label] = f.name;
+        headerToField[normalizeHeader(f.label)] = f.name;
       });
 
-      const existingNames = new Set(data.map(d => d.name?.toString().toLowerCase().trim()).filter(Boolean));
+      // Generate a unique key using name and optional itemCode
+      const getUniqueKey = (item) => {
+        const namePart = item.name?.toString().toLowerCase().trim() || '';
+        const codePart = item.itemCode?.toString().toLowerCase().trim() || '';
+        return codePart ? `${namePart}|${codePart}` : namePart;
+      };
 
-      const newItems = [];
+      const existingItemsMap = new Map(
+        data.map(d => [getUniqueKey(d), d])
+      );
+
+      const itemsToCreate = [];
+      const itemsToUpdate = [];
+
       worksheet.eachRow((row, rowNumber) => {
         if (rowNumber === 1) return;
-        const item = { id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+        const rowData = {};
         let hasData = false;
         row.eachCell((cell, colNumber) => {
           const header = headers[colNumber];
           const fieldName = headerToField[header];
           if (fieldName) {
-            item[fieldName] = cell.value;
+            let val = cell.value;
+            if (val && typeof val === 'object') {
+              if ('result' in val) val = val.result;
+              else if ('text' in val) val = val.text;
+            }
+            rowData[fieldName] = val;
             hasData = true;
           }
         });
 
-        let initialPrice = 0;
-        if (item.currentPrice != null) {
-          item.currentPrice = Number(item.currentPrice);
-          initialPrice = item.currentPrice;
-        }
-        if (item.currentRate != null) {
-          item.currentRate = Number(item.currentRate);
-          initialPrice = item.currentRate;
-        }
-        item.priceHistory = [{ price: initialPrice, date: item.createdAt }];
-        
-        if (hasData && item.name) {
-          const nameNormalized = item.name.toString().toLowerCase().trim();
-          if (!existingNames.has(nameNormalized)) {
-            newItems.push(item);
-            existingNames.add(nameNormalized);
+        if (hasData && rowData.name) {
+          const key = getUniqueKey(rowData);
+          const existingItem = existingItemsMap.get(key);
+
+          if (existingItem) {
+            itemsToUpdate.push({ existingItem, rowData });
+          } else {
+            itemsToCreate.push(rowData);
+            // Put in map to avoid creating duplicates within the same sheet
+            existingItemsMap.set(key, rowData);
           }
         }
       });
 
-      if (newItems.length > 0) {
-        for (const item of newItems) {
-          await createItem(item);
+      let createdCount = 0;
+      let updatedCount = 0;
+      const updatedSummaryIds = new Set();
+      let summaryItemsUpdated = false;
+
+      // Imports for database & cascading recomputation
+      const { getAllFromDB, putToDB, addToSyncQueue } = await import('../lib/db');
+      const { recomputeSummaryCost } = await import('../lib/billing');
+      const allSummaryItems = await getAllFromDB('summaryItems');
+
+      // 1. Process updates
+      const parseNumericValue = (val) => {
+        if (val === null || val === undefined || val === '') return null;
+        if (typeof val === 'number') return val;
+        const cleaned = val.toString().replace(/[₱\$,\s]/g, '');
+        const parsed = Number(cleaned);
+        return isNaN(parsed) ? null : parsed;
+      };
+
+      for (const { existingItem, rowData } of itemsToUpdate) {
+        // Normalize rates/prices
+        if (rowData.currentPrice != null) rowData.currentPrice = parseNumericValue(rowData.currentPrice);
+        if (rowData.currentRate != null) rowData.currentRate = parseNumericValue(rowData.currentRate);
+
+        let hasChanges = false;
+        const updatedFields = { ...existingItem };
+        
+        fields.forEach(f => {
+          if (f.name === 'name' || f.name === 'itemCode') return; // Match keys are not modified via import
+          if (rowData[f.name] !== undefined) {
+            const oldVal = existingItem[f.name];
+            const newVal = rowData[f.name];
+            if (oldVal !== newVal) {
+              updatedFields[f.name] = newVal;
+              hasChanges = true;
+            }
+          }
+        });
+
+        if (hasChanges) {
+          const isRate = fields.some(f => f.name === 'currentRate');
+          const priceField = isRate ? 'currentRate' : 'currentPrice';
+          const oldPrice = Number(existingItem[priceField] || 0);
+          const newPrice = Number(updatedFields[priceField] || 0);
+
+          if (newPrice !== oldPrice) {
+            const historyEntry = { price: newPrice, date: new Date().toISOString() };
+            updatedFields.priceHistory = [historyEntry, ...(existingItem.priceHistory || [])];
+          }
+
+          await updateItem(updatedFields);
+          updatedCount++;
+
+          // Handle cascading updates for summaryItems referencing this master data item
+          if (newPrice !== oldPrice || existingItem.name !== updatedFields.name || existingItem.unit !== updatedFields.unit) {
+            const affectedItems = allSummaryItems.filter(item => item.referenceId === existingItem.id);
+            for (const item of affectedItems) {
+              const qty = item.quantity || 1;
+              const duration = item.duration || 1;
+              const isGroupLabor = item.duration !== undefined;
+              const newTotal = isGroupLabor ? (newPrice * duration * qty) : (newPrice * qty);
+              const updateObj = { 
+                ...item, 
+                unitCost: newPrice,
+                unitCostAtTimeOfAdding: newPrice, 
+                totalCost: newTotal,
+                updatedAt: new Date().toISOString()
+              };
+              if (updatedFields.name) updateObj.name = updatedFields.name;
+              if (updatedFields.unit) updateObj.unit = updatedFields.unit;
+              await putToDB('summaryItems', updateObj);
+              await addToSyncQueue({ type: 'update', collection: 'summaryItems', payload: updateObj });
+              updatedSummaryIds.add(item.summaryId);
+              summaryItemsUpdated = true;
+            }
+          }
         }
-        alert(`Successfully imported ${newItems.length} records.`);
+      }
+
+      // 2. Process creates
+      for (const rowData of itemsToCreate) {
+        if (rowData.currentPrice != null) rowData.currentPrice = parseNumericValue(rowData.currentPrice);
+        if (rowData.currentRate != null) rowData.currentRate = parseNumericValue(rowData.currentRate);
+
+        const newItem = { 
+          id: crypto.randomUUID(), 
+          ...rowData,
+          createdAt: new Date().toISOString() 
+        };
+        
+        let initialPrice = 0;
+        if (newItem.currentPrice != null) {
+          initialPrice = newItem.currentPrice;
+        }
+        if (newItem.currentRate != null) {
+          initialPrice = newItem.currentRate;
+        }
+        newItem.priceHistory = [{ price: initialPrice, date: newItem.createdAt }];
+
+        await createItem(newItem);
+        createdCount++;
+      }
+
+      // 3. Recompute summaries if any affected summaryItems were updated
+      if (summaryItemsUpdated) {
+        window.dispatchEvent(new CustomEvent('localDataUpdated', { detail: 'summaryItems' }));
+        window.dispatchEvent(new Event('triggerSync'));
+        for (const sId of updatedSummaryIds) {
+          await recomputeSummaryCost(sId);
+        }
+      }
+
+      if (createdCount > 0 || updatedCount > 0) {
+        alert(`Successfully imported: ${createdCount} created, ${updatedCount} updated.`);
       } else {
-        alert('No valid records found to import. Check column headers.');
+        alert('No new or modified records found to import.');
       }
     } catch (err) {
       console.error(err);

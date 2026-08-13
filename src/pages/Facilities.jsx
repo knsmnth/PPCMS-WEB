@@ -188,40 +188,80 @@ export default function Facilities() {
         'Address': 'address'
       };
 
-      const existingFacilitiesSet = new Set(
-        facilities.map(f => `${f.name?.toString().toLowerCase().trim()}|${(f.facilityNo || '').toString().toLowerCase().trim()}`)
+      const existingFacilitiesMap = new Map(
+        facilities.map(f => [
+          `${f.name?.toString().toLowerCase().trim()}|${(f.facilityNo || '').toString().toLowerCase().trim()}`,
+          f
+        ])
       );
 
-      let newCount = 0;
+      const itemsToCreate = [];
+      const itemsToUpdate = [];
+
       for (let i = 2; i <= worksheet.rowCount; i++) {
         const row = worksheet.getRow(i);
-        const item = { id: crypto.randomUUID(), campusId: selectedCampusId || campuses[0]?.id, totalCost: 0 };
+        const rowData = { campusId: selectedCampusId || campuses[0]?.id, totalCost: 0 };
         let hasData = false;
         
         row.eachCell((cell, colNumber) => {
           const header = headers[colNumber];
           const fieldName = headerToField[header];
           if (fieldName) {
-            item[fieldName] = cell.value?.toString() || '';
-            if (item[fieldName]) hasData = true;
+            rowData[fieldName] = cell.value?.toString() || '';
+            if (rowData[fieldName]) hasData = true;
           }
         });
 
-        if (hasData && item.name) {
-          const uniqueKey = `${item.name?.toString().toLowerCase().trim()}|${(item.facilityNo || '').toString().toLowerCase().trim()}`;
-          if (!existingFacilitiesSet.has(uniqueKey)) {
-            await createItem(item);
-            existingFacilitiesSet.add(uniqueKey);
-            newCount++;
+        if (hasData && rowData.name) {
+          const uniqueKey = `${rowData.name?.toString().toLowerCase().trim()}|${(rowData.facilityNo || '').toString().toLowerCase().trim()}`;
+          const existingFacility = existingFacilitiesMap.get(uniqueKey);
+
+          if (existingFacility) {
+            itemsToUpdate.push({ existingFacility, rowData });
+          } else {
+            itemsToCreate.push(rowData);
+            // Map it to avoid creating duplicate keys within the same sheet
+            existingFacilitiesMap.set(uniqueKey, rowData);
           }
         }
       }
 
-      if (newCount > 0) {
-        alert(`Successfully imported ${newCount} facilities.`);
+      let createdCount = 0;
+      let updatedCount = 0;
+
+      for (const { existingFacility, rowData } of itemsToUpdate) {
+        let hasChanges = false;
+        const updatedFields = { ...existingFacility };
+
+        const fieldsToCompare = ['type', 'address'];
+        fieldsToCompare.forEach(field => {
+          if (rowData[field] !== undefined && existingFacility[field] !== rowData[field]) {
+            updatedFields[field] = rowData[field];
+            hasChanges = true;
+          }
+        });
+
+        if (hasChanges) {
+          await updateItem(updatedFields);
+          updatedCount++;
+        }
+      }
+
+      for (const rowData of itemsToCreate) {
+        const newItem = {
+          id: crypto.randomUUID(),
+          ...rowData,
+          createdAt: new Date().toISOString()
+        };
+        await createItem(newItem);
+        createdCount++;
+      }
+
+      if (createdCount > 0 || updatedCount > 0) {
+        alert(`Successfully imported: ${createdCount} created, ${updatedCount} updated.`);
         refresh();
       } else {
-        alert('No valid records found to import. Check column headers.');
+        alert('No new or modified facility records found to import.');
       }
     } catch (err) {
       console.error(err);

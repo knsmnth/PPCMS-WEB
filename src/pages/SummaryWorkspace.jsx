@@ -600,14 +600,14 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
   const [editItemDuration, setEditItemDuration] = useState('1');
   const [editItemReferenceId, setEditItemReferenceId] = useState('');
 
+  const isBulkType = summary.type === 'bulk';
+
   const handleOpenEditItem = (item) => {
     setEditingItem(item);
     setEditItemName(item.name || '');
     setEditItemUnit(item.unit || '');
     setEditItemPrice(item.unitCostAtTimeOfAdding !== undefined ? item.unitCostAtTimeOfAdding : '');
     setEditItemQty(item.quantity !== undefined ? item.quantity : 1);
-    setEditItemDuration(item.duration !== undefined ? item.duration : 1);
-    setEditItemReferenceId(item.referenceId || '');
     setIsEditItemOpen(true);
   };
 
@@ -615,17 +615,14 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
     if (!editingItem) return;
     const qty = Number(editItemQty) || 0;
     const price = Number(editItemPrice) || 0;
-    const duration = isLaborType ? (Number(editItemDuration) || 1) : 1;
-    const newTotalCost = isLaborType ? (price * duration * qty) : (price * qty);
+    const newTotalCost = price * qty;
 
     await updateSummaryItem({
       ...editingItem,
       name: editItemName.trim() || editingItem.name,
       unit: editItemUnit.trim(),
-      referenceId: editItemReferenceId || editingItem.referenceId,
       unitCostAtTimeOfAdding: price,
       quantity: qty,
-      ...(isLaborType && { duration }),
       totalCost: newTotalCost
     });
 
@@ -920,7 +917,7 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
               )}
               <TableHead style={{ textAlign: 'right' }}>Unit Price</TableHead>
               <TableHead style={{ textAlign: 'right' }}>Total Item Cost</TableHead>
-              <TableHead style={{ textAlign: 'right', width: '100px' }}>Actions</TableHead>
+              <TableHead style={{ textAlign: 'right', width: isBulkType ? '100px' : '80px' }}>{isBulkType ? 'Actions' : 'Exclude'}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -990,15 +987,17 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
                      ₱{item.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </TableCell>
                   <TableCell style={{ textAlign: 'right', display: 'flex', gap: '0.35rem', justifyContent: 'flex-end', alignItems: 'center', height: '100%' }}>
-                    <button
-                      onClick={() => handleOpenEditItem(item)}
-                      style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.35rem', transition: 'all 0.2s', display: 'flex', alignItems: 'center' }}
-                      onMouseOver={(e) => e.currentTarget.style.color = 'var(--primary)'}
-                      onMouseOut={(e) => e.currentTarget.style.color = '#a1a1aa'}
-                      title="Edit asset details"
-                    >
-                      <Edit2 size={15} />
-                    </button>
+                    {isBulkType && (
+                      <button
+                        onClick={() => handleOpenEditItem(item)}
+                        style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.35rem', transition: 'all 0.2s', display: 'flex', alignItems: 'center' }}
+                        onMouseOver={(e) => e.currentTarget.style.color = 'var(--primary)'}
+                        onMouseOut={(e) => e.currentTarget.style.color = '#a1a1aa'}
+                        title="Edit manual item"
+                      >
+                        <Edit2 size={15} />
+                      </button>
+                    )}
                     <label title="Exclude this item" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0.2rem' }}>
                       <input
                         type="checkbox"
@@ -1259,72 +1258,52 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
         </div>
       )}
 
-      {/* Edit Item / Asset Dialog */}
-      <Dialog open={isEditItemOpen} onOpenChange={setIsEditItemOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Asset Details</DialogTitle>
-          </DialogHeader>
-          <DialogBody>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {summary.type !== 'bulk' && MasterDataSelector && (
+      {/* Edit Item Dialog (for Bulk / Manual Group) */}
+      {isBulkType && (
+        <Dialog open={isEditItemOpen} onOpenChange={setIsEditItemOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Manual Item Specification</DialogTitle>
+            </DialogHeader>
+            <DialogBody>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                   <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>
-                    Replace from Master Data (Optional)
-                  </label>
-                  <MasterDataSelector
-                    type={summary.type}
-                    onSelect={(selectedMaster) => {
-                      if (selectedMaster) {
-                        setEditItemName(selectedMaster.name);
-                        setEditItemUnit(selectedMaster.unit || '');
-                        setEditItemPrice(Number(selectedMaster.currentPrice || selectedMaster.currentRate) || 0);
-                        setEditItemReferenceId(selectedMaster.id);
-                      }
-                    }}
-                    selectedId={editItemReferenceId}
-                  />
-                </div>
-              )}
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>
-                  Item Specification / Description *
-                </label>
-                <Input
-                  value={editItemName}
-                  onChange={(e) => setEditItemName(e.target.value)}
-                  placeholder="e.g. Paint Brush 2"
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>
-                    Unit
+                    Item Specification / Description *
                   </label>
                   <Input
-                    value={editItemUnit}
-                    onChange={(e) => setEditItemUnit(e.target.value)}
-                    placeholder="e.g. pcs, bags, boxes"
+                    value={editItemName}
+                    onChange={(e) => setEditItemName(e.target.value)}
+                    placeholder="Enter description..."
                   />
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>
-                    Unit Price (₱) *
-                  </label>
-                  <Input
-                    type="number"
-                    step="any"
-                    min="0"
-                    value={editItemPrice}
-                    onChange={(e) => setEditItemPrice(e.target.value)}
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: isLaborType ? '1fr 1fr' : '1fr', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>
+                      Unit
+                    </label>
+                    <Input
+                      value={editItemUnit}
+                      onChange={(e) => setEditItemUnit(e.target.value)}
+                      placeholder="e.g. pcs, lot, sq.m"
+                    />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>
+                      Unit Price (₱) *
+                    </label>
+                    <Input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={editItemPrice}
+                      onChange={(e) => setEditItemPrice(e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                   <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>
                     Quantity *
@@ -1338,46 +1317,31 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
                     placeholder="1"
                   />
                 </div>
-                {isLaborType && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>
-                      Duration (days) *
-                    </label>
-                    <Input
-                      type="number"
-                      step="any"
-                      min="1"
-                      value={editItemDuration}
-                      onChange={(e) => setEditItemDuration(e.target.value)}
-                      placeholder="1"
-                    />
-                  </div>
-                )}
-              </div>
 
-              <div style={{ padding: '0.75rem 1rem', background: 'var(--secondary)', borderRadius: 'var(--radius)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
-                  Computed Item Total
-                </span>
-                <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary)' }}>
-                  ₱{((Number(editItemPrice) || 0) * (Number(editItemQty) || 0) * (isLaborType ? (Number(editItemDuration) || 1) : 1)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
+                <div style={{ padding: '0.75rem 1rem', background: 'var(--secondary)', borderRadius: 'var(--radius)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
+                    Computed Item Total
+                  </span>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary)' }}>
+                    ₱{((Number(editItemPrice) || 0) * (Number(editItemQty) || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
               </div>
-            </div>
-          </DialogBody>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditItemOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSaveItemEdit}
-              disabled={!editItemName.trim() || editItemPrice === '' || editItemQty === ''}
-            >
-              Save Changes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </DialogBody>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditItemOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveItemEdit}
+                disabled={!editItemName.trim() || editItemPrice === '' || editItemQty === ''}
+              >
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

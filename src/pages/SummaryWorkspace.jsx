@@ -343,140 +343,32 @@ export default function SummaryWorkspace() {
       )}
 
       <div 
-        style={{ display: 'flex', flexDirection: 'column', gap: '3rem', minHeight: '50vh' }}
+        style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem', minHeight: '50vh' }}
         onDragOver={handleGroupDragOver}
       >
-      {sortedSummaries.map((summary, groupIndex) => {
-        const groupItems = items.filter(i => i.summaryId === summary.id);
-        const showLaborState = (summary.type === 'material' || summary.type === 'bulk') && summary.showLabor !== false;
-        const showToolsState = summary.showTools !== false;
-        const showOcmState = summary.showOcm !== false;
-        const hasAnyContainerObj = showLaborState || showToolsState || showOcmState;
-        
-        const totalBaseCostObj = groupItems
-          .filter(i => !i.isExcluded)
-          .reduce((sum, item) => sum + (item.totalCost || 0), 0);
-        
-        return (
-          <div 
-            key={summary.id} 
-            className="animate-fade-in" 
-            draggable
-            onDragStart={(e) => handleGroupDragStart(e, groupIndex)}
-            onDragOver={handleGroupDragOver}
-            onDrop={(e) => handleGroupDrop(e, groupIndex)}
-            style={{ backgroundColor: 'var(--background)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)', overflow: 'hidden', cursor: 'grab' }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem 1.5rem', borderBottom: '2px solid var(--border)', backgroundColor: '#fafafa' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div style={{ padding: '0.625rem', backgroundColor: 'var(--secondary)', borderRadius: '0.5rem', color: 'var(--primary)' }}>
-                  {getIcon(summary.type)}
-                </div>
-                <div>
-                  <h3 style={{ fontWeight: 800, fontSize: '1.1rem', letterSpacing: '-0.02em', color: 'var(--primary)' }}>{summary.name}</h3>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    {summary.type} REQUISITION
-                  </div>
-                </div>
-              </div>
-              <div style={{ textAlign: 'right', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '1rem', borderRight: '1px solid var(--border)', paddingRight: '1rem' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted-foreground)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={!!summary.isExcluded} 
-                      onChange={async () => {
-                        const newExcludedState = !summary.isExcluded;
-                        await updateSummary({ 
-                          ...summary, 
-                          isExcluded: newExcludedState,
-                          excludeLabor: newExcludedState,
-                          excludeTools: newExcludedState,
-                          excludeOcm: newExcludedState
-                        });
-                        await Promise.all(groupItems.map(item => {
-                          if (!!item.isExcluded !== newExcludedState) {
-                            return updateSummaryItem({ ...item, isExcluded: newExcludedState });
-                          }
-                          return Promise.resolve();
-                        }));
-                      }}
-                    />
-                    EXCLUDE GROUP
-                  </label>
-                </div>
-                
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', textAlign: 'right' }}>
-                  <div>
-                    <div style={{ fontSize: '0.70rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.1rem', textTransform: 'uppercase' }}>
-                      {summary.type === 'labor' ? 'BASE LABOR COST' : 'BASE MATERIAL COST'}
-                    </div>
-                    <div style={{ fontWeight: 700, fontSize: '1.2rem', color: 'var(--foreground)', letterSpacing: '-0.02em' }}>
-                      ₱{totalBaseCostObj.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </div>
-                  </div>
-
-                  {(summary.totalCost !== undefined && (summary.totalCost || 0) > totalBaseCostObj) && (
-                    <>
-                      <div style={{ fontSize: '1.2rem', color: 'var(--muted-foreground)' }}>+</div>
-                      <div>
-                        <div style={{ fontSize: '0.70rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.1rem', textTransform: 'uppercase' }}>
-                          INDIRECT COSTS
-                        </div>
-                        <div style={{ fontWeight: 700, fontSize: '1.2rem', color: 'var(--foreground)', letterSpacing: '-0.02em' }}>
-                          ₱{((summary.totalCost || 0) - totalBaseCostObj).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  <div style={{ paddingLeft: '1.5rem', borderLeft: '1px solid var(--border)' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--primary)', marginBottom: '0.1rem', textTransform: 'uppercase' }}>
-                      GRAND TOTAL
-                    </div>
-                    <div style={{ fontWeight: 900, fontSize: '1.5rem', color: 'var(--primary)', letterSpacing: '-0.03em' }}>
-                      ₱{(summary.totalCost || totalBaseCostObj).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', borderLeft: '1px solid var(--border)', paddingLeft: '1.5rem' }}>
-                  <button
-                    onClick={() => {
-                      setEditingSummary(summary);
-                      setEditSummaryName(summary.name);
-                      setEditSummaryType(summary.type);
-                      setEditDialogOpen(true);
-                    }}
-                    style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.2rem' }}
-                    title="Edit Category Name"
-                  >
-                    <Edit2 size={14} />
-                  </button>
-                  <button 
-                    onClick={() => handleDeleteSummary(summary)}
-                    style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.2rem' }}
-                    onMouseOver={(e) => e.currentTarget.style.color = 'var(--destructive)'}
-                    onMouseOut={(e) => e.currentTarget.style.color = '#a1a1aa'}
-                    title="Delete Category entirely"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-            </div>
-            
-            <VirtualizedSummaryTable 
-              summary={summary} 
-              groupItems={groupItems} 
-              deleteSummaryItem={deleteSummaryItem} 
-              createSummaryItem={createSummaryItem}
-              updateSummaryItem={updateSummaryItem}
-              updateSummary={updateSummary}
-              MasterDataSelector={MasterDataSelector}              projectContext={projectContext}            />
-          </div>
-        );
-      })}
+      {sortedSummaries.map((summary, groupIndex) => (
+        <WorkGroupCard
+          key={summary.id}
+          summary={summary}
+          groupIndex={groupIndex}
+          groupItems={items.filter(i => i.summaryId === summary.id)}
+          deleteSummaryItem={deleteSummaryItem}
+          createSummaryItem={createSummaryItem}
+          updateSummaryItem={updateSummaryItem}
+          updateSummary={updateSummary}
+          handleDeleteSummary={handleDeleteSummary}
+          setEditingSummary={setEditingSummary}
+          setEditSummaryName={setEditSummaryName}
+          setEditSummaryType={setEditSummaryType}
+          setEditDialogOpen={setEditDialogOpen}
+          handleGroupDragStart={handleGroupDragStart}
+          handleGroupDragOver={handleGroupDragOver}
+          handleGroupDrop={handleGroupDrop}
+          MasterDataSelector={MasterDataSelector}
+          projectContext={projectContext}
+          getIcon={getIcon}
+        />
+      ))}
       </div>
 
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
@@ -490,7 +382,9 @@ export default function SummaryWorkspace() {
                 onChange={(e) => setEditSummaryType(e.target.value)}
               >
                 <option value="material">Material Assets</option>
-                <option value="labor">Personnel & Labor</option>                <option value="bulk">Bulk / Manual Group</option>              </Select>
+                <option value="labor">Personnel & Labor</option>
+                <option value="bulk">Bulk / Manual Group</option>
+              </Select>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Category Title</label>
@@ -520,42 +414,42 @@ function AddItemForm({ summary, onAdd, MasterDataSelector }) {
   const isBulk = summary.type === 'bulk';
 
   return (
-    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', backgroundColor: 'transparent', padding: '0.5rem 0 0 0', borderTop: '1px dashed var(--border)' }}>
+    <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
       {isBulk ? (
         <>
-          <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <div style={{ flex: 2, minWidth: '160px', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)' }}>ITEM SPECIFICATION</span>
             <Input placeholder="Enter description..." value={manualName} onChange={e => setManualName(e.target.value)} style={{ height: '2.5rem' }} />
           </div>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <div style={{ flex: 1, minWidth: '90px', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)' }}>UNIT</span>
             <Input placeholder="e.g. pcs, lot, sq.m" value={manualUnit} onChange={e => setManualUnit(e.target.value)} style={{ height: '2.5rem' }} />
           </div>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <div style={{ flex: 1, minWidth: '100px', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)' }}>UNIT PRICE (₱)</span>
             <Input type="number" placeholder="0.00" value={manualPrice} onChange={e => setManualPrice(e.target.value)} style={{ height: '2.5rem' }} />
           </div>
         </>
       ) : (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+        <div style={{ flex: 1, minWidth: '220px', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
           <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)' }}>SELECT ASSET</span>
           <MasterDataSelector type={summary.type} onSelect={setSelected} selectedId={selected?.id || ''} />
         </div>
       )}
       
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', width: '80px' }}>
         <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)' }}>QTY</span>
-        <Input type="number" placeholder="0" value={qty} onChange={e => setQty(e.target.value)} style={{ width: '80px', height: '2.5rem' }} />
+        <Input type="number" placeholder="0" value={qty} onChange={e => setQty(e.target.value)} style={{ width: '100%', height: '2.5rem', textAlign: 'center' }} />
       </div>
       {isLabor && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', width: '80px' }}>
           <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted-foreground)' }}>DURATION</span>
-          <Input type="number" placeholder="1" value={duration} onChange={e => setDuration(e.target.value)} style={{ width: '80px', height: '2.5rem' }} />
+          <Input type="number" placeholder="1" value={duration} onChange={e => setDuration(e.target.value)} style={{ width: '100%', height: '2.5rem', textAlign: 'center' }} />
         </div>
       )}
-      <div style={{ alignSelf: 'flex-end', paddingBottom: '2px', display: 'flex', gap: '0.5rem' }}>
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
         {summary.type === 'material' && (
-          <Button size="md" variant="outline" onClick={() => alert('Import content from templates not yet fully implemented.')}>
+          <Button size="md" variant="outline" onClick={() => alert('Import content from templates not yet fully implemented.')} style={{ height: '2.5rem' }}>
             Import Content
           </Button>
         )}
@@ -578,15 +472,35 @@ function AddItemForm({ summary, onAdd, MasterDataSelector }) {
             }
           }} 
           disabled={isBulk ? (!manualName || !manualPrice || !qty) : (!selected || !qty)}
+          style={{ height: '2.5rem', padding: '0 1.5rem', fontWeight: 700 }}
         >
-          Add to Ledger
+          ADD
         </Button>
       </div>
     </div>
   );
 }
 
-export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem, createSummaryItem, updateSummaryItem, updateSummary, MasterDataSelector, projectContext }) {
+export function WorkGroupCard({
+  summary,
+  groupIndex,
+  groupItems,
+  deleteSummaryItem,
+  createSummaryItem,
+  updateSummaryItem,
+  updateSummary,
+  handleDeleteSummary,
+  setEditingSummary,
+  setEditSummaryName,
+  setEditSummaryType,
+  setEditDialogOpen,
+  handleGroupDragStart,
+  handleGroupDragOver,
+  handleGroupDrop,
+  MasterDataSelector,
+  projectContext,
+  getIcon
+}) {
   const parentRef = useRef(null);
   
   const [sortedItems, setSortedItems] = useState(groupItems);
@@ -598,9 +512,9 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
   const [editItemPrice, setEditItemPrice] = useState('');
   const [editItemQty, setEditItemQty] = useState('');
   const [editItemDuration, setEditItemDuration] = useState('1');
-  const [editItemReferenceId, setEditItemReferenceId] = useState('');
 
   const isBulkType = summary.type === 'bulk';
+  const isLaborType = summary.type === 'labor';
 
   const handleOpenEditItem = (item) => {
     setEditingItem(item);
@@ -638,16 +552,15 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
     setSortedItems([...groupItems].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)));
   }, [groupItems]);
 
-  const handleDragStart = (e, index) => {
+  const handleItemDragStart = (e, index) => {
     e.dataTransfer.setData('text/plain', index);
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleDragOver = (e) => {
+  const handleItemDragOver = (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
 
-    // Auto-scroll logic for virtualized table drag-and-drop
     if (!parentRef.current) return;
     const { top, bottom } = parentRef.current.getBoundingClientRect();
     const buffer = 50;
@@ -660,7 +573,7 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
     }
   };
 
-  const handleDrop = async (e, destIndex) => {
+  const handleItemDrop = async (e, destIndex) => {
     e.preventDefault();
     const srcIndexStr = e.dataTransfer.getData('text/plain');
     if (!srcIndexStr) return;
@@ -684,7 +597,6 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
   const [showOcm, setShowOcm] = useState(summary.showOcm !== false);
   const [showLaborState, setShowLaborState] = useState(summary.showLabor !== false);
 
-  // Sync local state when summary prop changes (e.g. from database)
   useEffect(() => {
     setLaborPercentage(summary.laborPercentage || 0);
     setToolsPercentage(summary.toolsPercentage || 0);
@@ -694,20 +606,12 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
     setShowLaborState(summary.showLabor !== false);
   }, [summary.id, summary.laborPercentage, summary.toolsPercentage, summary.ocmPercentage, summary.showTools, summary.showOcm, summary.showLabor, summary.type]);
 
-  // Calculate costs based on summary type
-  const isLaborType = summary.type === 'labor';
-
   const showLabor = (summary.type === 'material' || summary.type === 'bulk') && showLaborState;
 
-  // Calculate total from items (this is the "base cost" for calculations)
-  // For material type: this is the material cost
-  // For labor type: this is the labor cost (sum of Qty * Duration * Unit Price)
   const totalBaseCost = groupItems
     .filter(i => !i.isExcluded)
     .reduce((sum, item) => sum + (item.totalCost || 0), 0);
 
-  // For labor type: total labor cost is the base cost (from items)
-  // For material type: labor cost is a percentage of material cost (if shown and not excluded)
   const effectiveLaborPerc = laborPercentage || projectContext?.defaultLaborPercentage || 0;
   const effectiveToolsPerc = toolsPercentage || projectContext?.defaultToolsPercentage || 0;
   const effectiveOcmPerc = ocmPercentage || projectContext?.defaultOcmPercentage || 0;
@@ -716,10 +620,8 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
     ? totalBaseCost
     : (showLabor && !summary.excludeLabor ? totalBaseCost * (effectiveLaborPerc / 100) : 0);
 
-  // Tools and Equipment cost is based on the base cost (if shown and not excluded)
   const totalToolsCost = (showTools && !summary.excludeTools) ? (totalBaseCost * (effectiveToolsPerc / 100)) : 0;
 
-  // OCM cost is based on (base cost + labor cost + tools cost) (if shown and not excluded)
   const ocmBase = isLaborType
     ? totalBaseCost + totalToolsCost
     : totalBaseCost + totalLaborCost + totalToolsCost;
@@ -728,15 +630,15 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
 
   const groupTotalCost = useMemo(() => {
     if (isLaborType) {
-      // For labor type: total cost = labor (totalBaseCost) + tools + OCM
       return totalBaseCost + totalToolsCost + totalOcmCost;
     }
-    // For material type: total work cost = materials (totalBaseCost) + labor + tools + OCM
     return totalBaseCost + totalLaborCost + totalToolsCost + totalOcmCost;
   }, [isLaborType, totalBaseCost, totalLaborCost, totalToolsCost, totalOcmCost]);
 
-  // Sync summary.totalCost with groupTotalCost (sum of the 3 boxes)
-  // We use a ref to track if we're currently updating to avoid race conditions
+  const indirectCost = isLaborType
+    ? totalToolsCost + totalOcmCost
+    : totalLaborCost + totalToolsCost + totalOcmCost;
+
   const isUpdatingRef = useRef(false);
 
   useEffect(() => {
@@ -755,6 +657,23 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
     }
   }, [groupTotalCost, summary.totalCost, updateSummary, summary]);
 
+  const handleToggleExcludeGroup = async () => {
+    const newExcludedState = !summary.isExcluded;
+    await updateSummary({ 
+      ...summary, 
+      isExcluded: newExcludedState,
+      excludeLabor: newExcludedState,
+      excludeTools: newExcludedState,
+      excludeOcm: newExcludedState
+    });
+    await Promise.all(groupItems.map(item => {
+      if (!!item.isExcluded !== newExcludedState) {
+        return updateSummaryItem({ ...item, isExcluded: newExcludedState });
+      }
+      return Promise.resolve();
+    }));
+  };
+
   const handleToggleContainer = async (type) => {
     const updates = { ...summary };
     let newLaborShow = showLaborState;
@@ -770,7 +689,6 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
       updates.showLabor = newLaborShow;
       if (!newLaborShow) { newLaborPerc = 0; setLaborPercentage(0); updates.laborPercentage = 0; }
       else {
-        // When enabling, we keep it 0 so it uses global by default
         newLaborPerc = 0;
         setLaborPercentage(0);
         updates.laborPercentage = 0;
@@ -797,7 +715,6 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
       }
     }
 
-    // Recompute total cost with fallback logic
     const effLabor = newLaborPerc || projectContext?.defaultLaborPercentage || 0;
     const effTools = newToolsPerc || projectContext?.defaultToolsPercentage || 0;
     const effOcm = newOcmPerc || projectContext?.defaultOcmPercentage || 0;
@@ -827,7 +744,6 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
     else if (type === 'tools') { updates.excludeTools = !summary.excludeTools; newExclTools = updates.excludeTools; }
     else if (type === 'ocm') { updates.excludeOcm = !summary.excludeOcm; newExclOcm = updates.excludeOcm; }
 
-    // Recompute total cost
     const effLabor = laborPercentage || projectContext?.defaultLaborPercentage || 0;
     const effTools = toolsPercentage || projectContext?.defaultToolsPercentage || 0;
     const effOcm = ocmPercentage || projectContext?.defaultOcmPercentage || 0;
@@ -846,8 +762,6 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
     }
     isUpdatingRef.current = false;
   };
-
-  const hasAnyContainer = showLabor || showTools || showOcm;
 
   const handlePercentageChange = async (type, value) => {
     const updates = { ...summary };
@@ -869,7 +783,6 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
       updates.ocmPercentage = value;
     }
 
-    // Recompute total cost immediately to avoid race condition with useEffect
     const effLabor = newLabor || projectContext?.defaultLaborPercentage || 0;
     const effTools = newTools || projectContext?.defaultToolsPercentage || 0;
     const effOcm = newOcm || projectContext?.defaultOcmPercentage || 0;
@@ -890,10 +803,53 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
     isUpdatingRef.current = false;
   };
 
+  const handleAddItem = async (selectedMasterItem, qty, durationInput) => {
+    if (!selectedMasterItem || !qty) return;
+    const unitCost = Number(selectedMasterItem.currentPrice || selectedMasterItem.currentRate || 0);
+    const quantity = Number(qty);
+
+    const existingItem = groupItems.find(i => i.referenceId === selectedMasterItem.id && i.unitCostAtTimeOfAdding === unitCost);
+
+    if (existingItem) {
+      const newQty = existingItem.quantity + quantity;
+      const duration = existingItem.duration || 1;
+      const newTotalCost = summary.type === 'labor'
+        ? existingItem.unitCostAtTimeOfAdding * duration * newQty
+        : existingItem.unitCostAtTimeOfAdding * newQty;
+
+      await updateSummaryItem({
+        ...existingItem,
+        quantity: newQty,
+        totalCost: newTotalCost
+      });
+    } else {
+      const isLabor = summary.type === 'labor';
+      const duration = isLabor ? (Number(durationInput) || 1) : 1;
+      const totalCost = isLabor
+        ? unitCost * duration * quantity
+        : unitCost * quantity;
+
+      const newItem = {
+        id: crypto.randomUUID(),
+        summaryId: summary.id,
+        referenceId: selectedMasterItem.id,
+        name: selectedMasterItem.name,
+        unit: selectedMasterItem.unit || '',
+        quantity,
+        ...(isLabor && { duration }),
+        unitCostAtTimeOfAdding: unitCost,
+        totalCost,
+        createdAt: new Date().toISOString()
+      };
+
+      await createSummaryItem(newItem);
+    }
+  };
+
   const rowVirtualizer = useVirtualizer({
     count: sortedItems.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 64, // estimated row height in px
+    estimateSize: () => 64,
     overscan: 50,
   });
 
@@ -904,198 +860,284 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
   const paddingBottom = virtualRows.length > 0 ? totalSize - virtualRows[virtualRows.length - 1].end : 0;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column' }}>
-      <div ref={parentRef} style={{ maxHeight: '500px', overflow: 'auto', borderTop: '1px solid var(--border)' }}>
-        <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
-                <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'var(--background)' }}>
-            <TableRow>
-              <TableHead>Item Name</TableHead>
-              <TableHead style={{ textAlign: 'center', width: '120px' }}>Qty</TableHead>
-              <TableHead style={{ textAlign: 'center', width: '80px' }}>Unit</TableHead>
-              {isLaborType && (
-                <TableHead style={{ textAlign: 'center', width: '120px' }}>Duration (days)</TableHead>
-              )}
-              <TableHead style={{ textAlign: 'right' }}>Unit Price</TableHead>
-              <TableHead style={{ textAlign: 'right' }}>Total Item Cost</TableHead>
-              <TableHead style={{ textAlign: 'right', width: isBulkType ? '100px' : '80px' }}>{isBulkType ? 'Actions' : 'Exclude'}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {paddingTop > 0 && (
-              <tr style={{ height: `${paddingTop}px`, border: 'none' }}>
-                <td colSpan={isLaborType ? 7 : 6} style={{ padding: 0, border: 0 }}>
-                  <div style={{ height: `${paddingTop}px` }} />
-                </td>
-              </tr>
-            )}
+    <div 
+      className="animate-fade-in work-group-card-outer"
+      draggable
+      onDragStart={(e) => handleGroupDragStart(e, groupIndex)}
+      onDragOver={handleGroupDragOver}
+      onDrop={(e) => handleGroupDrop(e, groupIndex)}
+      style={{ opacity: summary.isExcluded ? 0.7 : 1, cursor: 'grab' }}
+    >
+      {/* Top Header of the One Single Outer Card */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.25rem', paddingBottom: '0.25rem' }}>
+        {/* Left Side: Icon, Title, Subtitle */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+          <div style={{ padding: '0.5rem', backgroundColor: 'var(--secondary)', borderRadius: '0.5rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {getIcon(summary.type)}
+          </div>
+          <div>
+            <h3 style={{ fontWeight: 800, fontSize: '1.2rem', letterSpacing: '-0.02em', color: 'var(--foreground)', margin: 0, textDecoration: summary.isExcluded ? 'line-through' : 'none' }}>
+              {summary.name}
+            </h3>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: '0.1rem' }}>
+              {summary.type} REQUISITION
+            </div>
+          </div>
+        </div>
 
-            {virtualRows.map((virtualRow) => {
-              const item = sortedItems[virtualRow.index];
-              return (
-                <TableRow
-                  key={item.id}
-                  ref={rowVirtualizer.measureElement}
-                  data-index={virtualRow.index}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, virtualRow.index)}
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, virtualRow.index)}
-                  style={{ opacity: item.isExcluded ? 0.4 : 1, transition: 'opacity 0.2s', cursor: 'grab' }}
-                >
-                  <TableCell>
-                    <div style={{ fontWeight: 700, color: 'var(--foreground)' }}>{item.name}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)' }}>PID: {item.id.substring(0, 8)}</div>
-                  </TableCell>
-                  <TableCell style={{ textAlign: 'center', fontWeight: 600 }}>
-                    <Input
-                      type="number"
-                      value={item.quantity}
-                      onChange={async (e) => {
-                        const newQty = Number(e.target.value);
-                        if (newQty >= 0) {
-                          const duration = item.duration || 1;
-                          const newTotalCost = isLaborType
-                            ? item.unitCostAtTimeOfAdding * duration * newQty
-                            : item.unitCostAtTimeOfAdding * newQty;
-                          await updateSummaryItem({ ...item, quantity: newQty, totalCost: newTotalCost });
-                        }
-                      }}
-                      style={{ width: '80px', height: '2rem', textAlign: 'center', padding: '0 0.25rem', margin: '0 auto' }}
-                    />
-                  </TableCell>
-                  <TableCell style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
-                    {item.unit || '-'}
-                  </TableCell>
+        {/* Right Side: Exclude Checkbox | Base Cost + Indirect Costs | Grand Total | Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', textAlign: 'right', flexWrap: 'wrap' }}>
+          {/* Exclude Group Checkbox */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--muted-foreground)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', textTransform: 'uppercase' }}>
+              <input 
+                type="checkbox" 
+                checked={!!summary.isExcluded} 
+                onChange={handleToggleExcludeGroup}
+              />
+              EXCLUDE GROUP
+            </label>
+          </div>
+
+          {/* Divider */}
+          <div style={{ borderLeft: '1px solid var(--border)', height: '36px', marginLeft: '0.25rem' }} />
+
+          {/* Base Cost */}
+          <div>
+            <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.1rem', textTransform: 'uppercase' }}>
+              {summary.type === 'labor' ? 'BASE LABOR COST' : 'BASE MATERIAL COST'}
+            </div>
+            <div style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--foreground)', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
+              ₱{totalBaseCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </div>
+          </div>
+
+          {/* Indirect Costs (if any) */}
+          {indirectCost > 0 && (
+            <>
+              <div style={{ fontSize: '1.2rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>+</div>
+              <div>
+                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.1rem', textTransform: 'uppercase' }}>
+                  INDIRECT COSTS
+                </div>
+                <div style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--foreground)', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
+                  ₱{indirectCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Divider */}
+          <div style={{ borderLeft: '1px solid var(--border)', height: '36px', marginLeft: '0.25rem' }} />
+
+          {/* Grand Total */}
+          <div>
+            <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--foreground)', marginBottom: '0.1rem', textTransform: 'uppercase' }}>
+              GRAND TOTAL
+            </div>
+            <div style={{ fontWeight: 900, fontSize: '1.5rem', color: 'var(--foreground)', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
+              ₱{groupTotalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div style={{ borderLeft: '1px solid var(--border)', height: '36px', marginLeft: '0.25rem' }} />
+
+          {/* Vertical Actions Column: Edit & Delete Icons */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'center' }}>
+            <button
+              onClick={() => {
+                setEditingSummary(summary);
+                setEditSummaryName(summary.name);
+                setEditSummaryType(summary.type);
+                setEditDialogOpen(true);
+              }}
+              style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.2rem', display: 'flex', alignItems: 'center', transition: 'color 0.2s' }}
+              onMouseOver={(e) => e.currentTarget.style.color = 'var(--foreground)'}
+              onMouseOut={(e) => e.currentTarget.style.color = '#a1a1aa'}
+              title="Edit Category Name"
+            >
+              <Edit2 size={14} />
+            </button>
+            <button 
+              onClick={() => handleDeleteSummary(summary)}
+              style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.2rem', display: 'flex', alignItems: 'center', transition: 'color 0.2s' }}
+              onMouseOver={(e) => e.currentTarget.style.color = 'var(--destructive)'}
+              onMouseOut={(e) => e.currentTarget.style.color = '#a1a1aa'}
+              title="Delete Category entirely"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Body Grid: Left Inner Ledger Box and Right Stacked Indirect Cards */}
+      <div className="work-group-body-grid">
+        {/* Left Inner Box: Add Asset Bar + Divider + Table */}
+        <div className="work-ledger-box">
+          <div style={{ padding: '1rem 1.25rem', backgroundColor: 'var(--background)' }}>
+            <AddItemForm
+              summary={summary}
+              onAdd={handleAddItem}
+              MasterDataSelector={MasterDataSelector}
+            />
+          </div>
+
+          <div style={{ borderTop: '1px solid var(--border)' }} />
+
+          <div ref={parentRef} style={{ maxHeight: '450px', overflow: 'auto' }}>
+            <Table wrapperStyle={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
+              <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'var(--background)' }}>
+                <TableRow>
+                  <TableHead>Item Name</TableHead>
+                  <TableHead style={{ textAlign: 'center', width: '120px' }}>Qty</TableHead>
+                  <TableHead style={{ textAlign: 'center', width: '80px' }}>Unit</TableHead>
                   {isLaborType && (
-                    <TableCell style={{ textAlign: 'center', fontWeight: 600 }}>
-                      <Input
-                        type="number"
-                        value={item.duration || 1}
-                        onChange={async (e) => {
-                          const newDuration = Number(e.target.value);
-                          if (newDuration >= 0) {
-                            const newTotalCost = item.unitCostAtTimeOfAdding * newDuration * item.quantity;
-                            await updateSummaryItem({ ...item, duration: newDuration, totalCost: newTotalCost });
-                          }
-                        }}
-                        style={{ width: '80px', height: '2rem', textAlign: 'center', padding: '0 0.25rem', margin: '0 auto' }}
-                      />
-                    </TableCell>
+                    <TableHead style={{ textAlign: 'center', width: '120px' }}>Duration (days)</TableHead>
                   )}
-                  <TableCell style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>₱{item.unitCostAtTimeOfAdding.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
-                  <TableCell style={{ textAlign: 'right', fontWeight: 800, color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>
-                     ₱{item.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </TableCell>
-                  <TableCell style={{ textAlign: 'right', display: 'flex', gap: '0.35rem', justifyContent: 'flex-end', alignItems: 'center', height: '100%' }}>
-                    {isBulkType && (
-                      <button
-                        onClick={() => handleOpenEditItem(item)}
-                        style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.35rem', transition: 'all 0.2s', display: 'flex', alignItems: 'center' }}
-                        onMouseOver={(e) => e.currentTarget.style.color = 'var(--primary)'}
-                        onMouseOut={(e) => e.currentTarget.style.color = '#a1a1aa'}
-                        title="Edit manual item"
-                      >
-                        <Edit2 size={15} />
-                      </button>
-                    )}
-                    <label title="Exclude this item" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0.2rem' }}>
-                      <input
-                        type="checkbox"
-                        checked={!!item.isExcluded}
-                        onChange={async () => {
-                          await updateSummaryItem({ ...item, isExcluded: !item.isExcluded });
-                        }}
-                      />
-                    </label>
-                    <button
-                      onClick={async () => {
-                        await deleteSummaryItem(item.id);
-                      }}
-                      style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.35rem', transition: 'all 0.2s', display: 'flex', alignItems: 'center' }}
-                      onMouseOver={(e) => e.currentTarget.style.color = 'var(--destructive)'}
-                      onMouseOut={(e) => e.currentTarget.style.color = '#a1a1aa'}
-                      title="Delete item"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </TableCell>
+                  <TableHead style={{ textAlign: 'right' }}>Unit Price</TableHead>
+                  <TableHead style={{ textAlign: 'right' }}>Total Item Cost</TableHead>
+                  <TableHead style={{ textAlign: 'right', width: isBulkType ? '100px' : '80px' }}>{isBulkType ? 'Actions' : 'Exclude'}</TableHead>
                 </TableRow>
-              );
-            })}
-            
-            {paddingBottom > 0 && (
-              <tr style={{ height: `${paddingBottom}px`, border: 'none' }}>
-                <td colSpan={isLaborType ? 7 : 6} style={{ padding: 0, border: 0 }}>
-                  <div style={{ height: `${paddingBottom}px` }} />
-                </td>
-              </tr>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      
-      {/* Footer Form row rendered normally below the virtualized table body */}
-      <div style={{ borderTop: '1px solid var(--border)', padding: '1.25rem', backgroundColor: 'var(--background)' }}>
-        <AddItemForm
-          summary={summary}
-          onAdd={async (selectedMasterItem, qty, durationInput) => {
-            if (!selectedMasterItem || !qty) return;
-            const unitCost = Number(selectedMasterItem.currentPrice || selectedMasterItem.currentRate || 0);
-            const quantity = Number(qty);
+              </TableHeader>
+              <TableBody>
+                {sortedItems.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={isLaborType ? 7 : 6} style={{ textAlign: 'center', padding: '3.5rem 1rem', color: 'var(--muted-foreground)' }}>
+                      <div style={{ fontSize: '0.875rem', fontWeight: 500 }}>No items attached yet.</div>
+                      <div style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>Use the asset selector above to add items to this group.</div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  <>
+                    {paddingTop > 0 && (
+                      <tr style={{ height: `${paddingTop}px`, border: 'none' }}>
+                        <td colSpan={isLaborType ? 7 : 6} style={{ padding: 0, border: 0 }}>
+                          <div style={{ height: `${paddingTop}px` }} />
+                        </td>
+                      </tr>
+                    )}
+                    {virtualRows.map((virtualRow) => {
+                      const item = sortedItems[virtualRow.index];
+                      return (
+                        <TableRow
+                          key={item.id}
+                          ref={rowVirtualizer.measureElement}
+                          data-index={virtualRow.index}
+                          draggable
+                          onDragStart={(e) => handleItemDragStart(e, virtualRow.index)}
+                          onDragOver={handleItemDragOver}
+                          onDrop={(e) => handleItemDrop(e, virtualRow.index)}
+                          style={{ opacity: item.isExcluded ? 0.4 : 1, transition: 'opacity 0.2s', cursor: 'grab' }}
+                        >
+                          <TableCell>
+                            <div style={{ fontWeight: 700, color: 'var(--foreground)' }}>{item.name}</div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)' }}>PID: {item.id.substring(0, 8)}</div>
+                          </TableCell>
+                          <TableCell style={{ textAlign: 'center', fontWeight: 600 }}>
+                            <Input
+                              type="number"
+                              value={item.quantity}
+                              onChange={async (e) => {
+                                const newQty = Number(e.target.value);
+                                if (newQty >= 0) {
+                                  const duration = item.duration || 1;
+                                  const newTotalCost = isLaborType
+                                    ? item.unitCostAtTimeOfAdding * duration * newQty
+                                    : item.unitCostAtTimeOfAdding * newQty;
+                                  await updateSummaryItem({ ...item, quantity: newQty, totalCost: newTotalCost });
+                                }
+                              }}
+                              style={{ width: '80px', height: '2rem', textAlign: 'center', padding: '0 0.25rem', margin: '0 auto' }}
+                            />
+                          </TableCell>
+                          <TableCell style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
+                            {item.unit || '-'}
+                          </TableCell>
+                          {isLaborType && (
+                            <TableCell style={{ textAlign: 'center', fontWeight: 600 }}>
+                              <Input
+                                type="number"
+                                value={item.duration || 1}
+                                onChange={async (e) => {
+                                  const newDuration = Number(e.target.value);
+                                  if (newDuration >= 0) {
+                                    const newTotalCost = item.unitCostAtTimeOfAdding * newDuration * item.quantity;
+                                    await updateSummaryItem({ ...item, duration: newDuration, totalCost: newTotalCost });
+                                  }
+                                }}
+                                style={{ width: '80px', height: '2rem', textAlign: 'center', padding: '0 0.25rem', margin: '0 auto' }}
+                              />
+                            </TableCell>
+                          )}
+                          <TableCell style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                            ₱{item.unitCostAtTimeOfAdding.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </TableCell>
+                          <TableCell style={{ textAlign: 'right', fontWeight: 800, color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>
+                            ₱{item.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </TableCell>
+                          <TableCell style={{ textAlign: 'right', display: 'flex', gap: '0.35rem', justifyContent: 'flex-end', alignItems: 'center', height: '100%' }}>
+                            {isBulkType && (
+                              <button
+                                onClick={() => handleOpenEditItem(item)}
+                                style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.35rem', transition: 'all 0.2s', display: 'flex', alignItems: 'center' }}
+                                onMouseOver={(e) => e.currentTarget.style.color = 'var(--primary)'}
+                                onMouseOut={(e) => e.currentTarget.style.color = '#a1a1aa'}
+                                title="Edit manual item"
+                              >
+                                <Edit2 size={15} />
+                              </button>
+                            )}
+                            <label title="Exclude this item" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0.2rem' }}>
+                              <input
+                                type="checkbox"
+                                checked={!!item.isExcluded}
+                                onChange={async () => {
+                                  await updateSummaryItem({ ...item, isExcluded: !item.isExcluded });
+                                }}
+                              />
+                            </label>
+                            <button
+                              onClick={async () => {
+                                await deleteSummaryItem(item.id);
+                              }}
+                              style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '0.35rem', transition: 'all 0.2s', display: 'flex', alignItems: 'center' }}
+                              onMouseOver={(e) => e.currentTarget.style.color = 'var(--destructive)'}
+                              onMouseOut={(e) => e.currentTarget.style.color = '#a1a1aa'}
+                              title="Delete item"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {paddingBottom > 0 && (
+                      <tr style={{ height: `${paddingBottom}px`, border: 'none' }}>
+                        <td colSpan={isLaborType ? 7 : 6} style={{ padding: 0, border: 0 }}>
+                          <div style={{ height: `${paddingBottom}px` }} />
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
 
-            const existingItem = groupItems.find(i => i.referenceId === selectedMasterItem.id && i.unitCostAtTimeOfAdding === unitCost);
-
-            if (existingItem) {
-              const newQty = existingItem.quantity + quantity;
-              const duration = existingItem.duration || 1;
-              const newTotalCost = summary.type === 'labor'
-                ? existingItem.unitCostAtTimeOfAdding * duration * newQty
-                : existingItem.unitCostAtTimeOfAdding * newQty;
-
-              await updateSummaryItem({
-                ...existingItem,
-                quantity: newQty,
-                totalCost: newTotalCost
-              });
-            } else {
-              const isLabor = summary.type === 'labor';
-              const duration = isLabor ? (Number(durationInput) || 1) : 1;
-              const totalCost = isLabor
-                ? unitCost * duration * quantity
-                : unitCost * quantity;
-
-              const newItem = {
-                id: crypto.randomUUID(),
-                summaryId: summary.id,
-                referenceId: selectedMasterItem.id,
-                name: selectedMasterItem.name,
-                unit: selectedMasterItem.unit || '',
-                quantity,
-                ...(isLabor && { duration }),
-                unitCostAtTimeOfAdding: unitCost,
-                totalCost,
-                createdAt: new Date().toISOString()
-              };
-
-              await createSummaryItem(newItem);
-            }
-          }}
-          MasterDataSelector={MasterDataSelector}
-        />
-      </div>
-
-      {/* Cost Breakdown Section with Percentage Rates */}
-      {(showLabor || showTools || showOcm) && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem', borderTop: '1px solid var(--border)', paddingTop: '1.25rem', paddingLeft: '1.25rem', paddingRight: '1.25rem', paddingBottom: '1.25rem', marginBottom: '0.5rem' }}>
-          {/* Labor Requisition - only show for material type */}
-          {(summary.type === 'material' || summary.type === 'bulk') && showLabor && (
-            <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', backgroundColor: '#fafafa', opacity: summary.excludeLabor ? 0.6 : 1 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--foreground)', textTransform: 'uppercase', textDecoration: summary.excludeLabor ? 'line-through' : 'none', margin: 0 }}>
+        {/* Right Column: 3 Stacked Indirect Cost Cards */}
+        <div className="work-indirect-sidebar">
+          {/* 1. Labor Requisition Card */}
+          {showLabor && (
+            <div className="work-indirect-card" style={{ opacity: summary.excludeLabor ? 0.6 : 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--foreground)', textTransform: 'uppercase', textDecoration: summary.excludeLabor ? 'line-through' : 'none', margin: 0, letterSpacing: '0.02em' }}>
                   LABOR REQUISITION
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.65rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
+                  <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.68rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
                     <input 
                       type="checkbox" 
                       checked={!!summary.excludeLabor} 
@@ -1114,39 +1156,42 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
                   </button>
                 </div>
               </div>
-              <div style={{ marginBottom: '0.75rem' }}>
+              
+              <div style={{ marginBottom: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Input
                     type="number"
                     placeholder={`${projectContext?.defaultLaborPercentage || 0}`}
                     value={laborPercentage === 0 ? '' : laborPercentage}
                     onChange={(e) => handlePercentageChange('labor', Number(e.target.value))}
-                    style={{ flex: 1, height: '2.25rem' }}
+                    style={{ flex: 1, height: '2.5rem' }}
                   />
-                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>%</span>
-                  {laborPercentage === 0 && (
-                    <span style={{ fontSize: '0.6rem', color: 'var(--primary)', fontWeight: 700, marginLeft: '0.25rem' }}>GLOBAL</span>
-                  )}
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>
+                    % {laborPercentage === 0 ? 'GLOBAL' : ''}
+                  </span>
                 </div>
               </div>
+
               <div>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.25rem' }}>TOTAL LABOR COST</div>
-                <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.2rem', textTransform: 'uppercase' }}>
+                  TOTAL LABOR COST
+                </div>
+                <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--foreground)', fontVariantNumeric: 'tabular-nums' }}>
                   ₱{totalLaborCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </div>
               </div>
             </div>
           )}
 
-          {/* Tools and Equipment */}
+          {/* 2. Tools & Equipment Card */}
           {showTools && (
-            <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', backgroundColor: '#fafafa', opacity: summary.excludeTools ? 0.6 : 1 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--foreground)', textTransform: 'uppercase', textDecoration: summary.excludeTools ? 'line-through' : 'none', margin: 0 }}>
+            <div className="work-indirect-card" style={{ opacity: summary.excludeTools ? 0.6 : 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--foreground)', textTransform: 'uppercase', textDecoration: summary.excludeTools ? 'line-through' : 'none', margin: 0, letterSpacing: '0.02em' }}>
                   TOOLS AND EQUIPMENT
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.65rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
+                  <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.68rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
                     <input 
                       type="checkbox" 
                       checked={!!summary.excludeTools} 
@@ -1165,39 +1210,42 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
                   </button>
                 </div>
               </div>
-              <div style={{ marginBottom: '0.75rem' }}>
+              
+              <div style={{ marginBottom: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Input
                     type="number"
                     placeholder={`${projectContext?.defaultToolsPercentage || 0}`}
                     value={toolsPercentage === 0 ? '' : toolsPercentage}
                     onChange={(e) => handlePercentageChange('tools', Number(e.target.value))}
-                    style={{ flex: 1, height: '2.25rem' }}
+                    style={{ flex: 1, height: '2.5rem' }}
                   />
-                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>%</span>
-                  {toolsPercentage === 0 && (
-                    <span style={{ fontSize: '0.6rem', color: 'var(--primary)', fontWeight: 700, marginLeft: '0.25rem' }}>GLOBAL</span>
-                  )}
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>
+                    % {toolsPercentage === 0 ? 'GLOBAL' : ''}
+                  </span>
                 </div>
               </div>
+
               <div>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.25rem' }}>TOTAL TOOLS AND EQUIPMENT COST</div>
-                <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.2rem', textTransform: 'uppercase' }}>
+                  TOTAL TOOLS AND EQUIPMENT
+                </div>
+                <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--foreground)', fontVariantNumeric: 'tabular-nums' }}>
                   ₱{totalToolsCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </div>
               </div>
             </div>
           )}
 
-          {/* OCM - Overhead, Contingencies and Miscellaneous */}
+          {/* 3. Overhead, Contingencies and Miscellaneous Card */}
           {showOcm && (
-            <div style={{ border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', backgroundColor: '#fafafa', opacity: summary.excludeOcm ? 0.6 : 1 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--foreground)', textTransform: 'uppercase', textDecoration: summary.excludeOcm ? 'line-through' : 'none', margin: 0 }}>
+            <div className="work-indirect-card" style={{ opacity: summary.excludeOcm ? 0.6 : 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--foreground)', textTransform: 'uppercase', textDecoration: summary.excludeOcm ? 'line-through' : 'none', margin: 0, letterSpacing: '0.02em' }}>
                   OVERHEAD, CONTINGENCIES AND MISCELLANEOUS
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.65rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
+                  <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.68rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
                     <input 
                       type="checkbox" 
                       checked={!!summary.excludeOcm} 
@@ -1216,47 +1264,55 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
                   </button>
                 </div>
               </div>
-              <div style={{ marginBottom: '0.75rem' }}>
+              
+              <div style={{ marginBottom: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Input
                     type="number"
                     placeholder={`${projectContext?.defaultOcmPercentage || 0}`}
                     value={ocmPercentage === 0 ? '' : ocmPercentage}
                     onChange={(e) => handlePercentageChange('ocm', Number(e.target.value))}
-                    style={{ flex: 1, height: '2.25rem' }}
+                    style={{ flex: 1, height: '2.5rem' }}
                   />
-                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>%</span>
-                  {ocmPercentage === 0 && (
-                    <span style={{ fontSize: '0.6rem', color: 'var(--primary)', fontWeight: 700, marginLeft: '0.25rem' }}>GLOBAL</span>
-                  )}
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>
+                    % {ocmPercentage === 0 ? 'GLOBAL' : ''}
+                  </span>
                 </div>
               </div>
+
               <div>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.25rem' }}>TOTAL OCM COST</div>
-                <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--muted-foreground)', marginBottom: '0.2rem', textTransform: 'uppercase' }}>
+                  TOTAL OCM COST
+                </div>
+                <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--foreground)', fontVariantNumeric: 'tabular-nums' }}>
                   ₱{totalOcmCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </div>
               </div>
             </div>
           )}
+
+          {/* Add Hidden / Removed Container Buttons */}
+          {(!showLabor || !showTools || !showOcm) && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {(summary.type === 'material' || summary.type === 'bulk') && !showLabor && (
+                <Button variant="outline" size="sm" onClick={() => handleToggleContainer('labor')} style={{ width: '100%', justifyContent: 'center' }}>
+                  + Add Labor Requisition
+                </Button>
+              )}
+              {!showTools && (
+                <Button variant="outline" size="sm" onClick={() => handleToggleContainer('tools')} style={{ width: '100%', justifyContent: 'center' }}>
+                  + Add Tools & Equipment
+                </Button>
+              )}
+              {!showOcm && (
+                <Button variant="outline" size="sm" onClick={() => handleToggleContainer('ocm')} style={{ width: '100%', justifyContent: 'center' }}>
+                  + Add OCM
+                </Button>
+              )}
+            </div>
+          )}
         </div>
-      )}
-      
-      {(!showLabor || !showTools || !showOcm) && (
-        <div style={{ padding: '0 1.25rem 1.25rem 1.25rem' }}>
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {(summary.type === 'material' || summary.type === 'bulk') && !showLabor && (
-              <Button variant="outline" size="sm" onClick={() => handleToggleContainer('labor')}>+ Add Labor Requisition</Button>
-            )}
-            {!showTools && (
-              <Button variant="outline" size="sm" onClick={() => handleToggleContainer('tools')}>+ Add Tools & Equipment</Button>
-            )}
-            {!showOcm && (
-              <Button variant="outline" size="sm" onClick={() => handleToggleContainer('ocm')}>+ Add OCM</Button>
-            )}
-          </div>
-        </div>
-      )}
+      </div>
 
       {/* Edit Item Dialog (for Bulk / Manual Group) */}
       {isBulkType && (
@@ -1345,3 +1401,7 @@ export function VirtualizedSummaryTable({ summary, groupItems, deleteSummaryItem
     </div>
   );
 }
+
+export { WorkGroupCard as VirtualizedSummaryTable };
+
+

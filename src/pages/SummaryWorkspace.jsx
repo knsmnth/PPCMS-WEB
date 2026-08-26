@@ -30,7 +30,7 @@ export default function SummaryWorkspace() {
   const query = scheduleId ? [{ field: 'scheduleOfWorkId', operator: '==', value: scheduleId }] : [];
   
   const { data: summaries, createItem: createSummary, updateItem: updateSummary, refresh: refreshSummaries } = useCollection('scheduleSummaries', query);
-  const { data: items, createItem: createSummaryItem, updateItem: updateSummaryItem, deleteItem: deleteSummaryItem } = useCollection('summaryItems');
+  const { data: items, loading: loadingItems, createItem: createSummaryItem, updateItem: updateSummaryItem, deleteItem: deleteSummaryItem } = useCollection('summaryItems');
   
   const { data: materials } = useCollection('materials');
   const { data: labor } = useCollection('laborTypes');
@@ -352,6 +352,7 @@ export default function SummaryWorkspace() {
           summary={summary}
           groupIndex={groupIndex}
           groupItems={items.filter(i => i.summaryId === summary.id)}
+          loadingItems={loadingItems}
           deleteSummaryItem={deleteSummaryItem}
           createSummaryItem={createSummaryItem}
           updateSummaryItem={updateSummaryItem}
@@ -485,6 +486,7 @@ export function WorkGroupCard({
   summary,
   groupIndex,
   groupItems,
+  loadingItems,
   deleteSummaryItem,
   createSummaryItem,
   updateSummaryItem,
@@ -642,7 +644,9 @@ export function WorkGroupCard({
   const isUpdatingRef = useRef(false);
 
   useEffect(() => {
-    if (isUpdatingRef.current) return;
+    if (loadingItems || isUpdatingRef.current) return;
+    // Guard: Do not wipe an existing non-zero cost if items are still resolving from DB
+    if (groupItems.length === 0 && (summary.totalCost || 0) > 0) return;
 
     if (Math.abs((summary.totalCost || 0) - groupTotalCost) > 0.01) {
       isUpdatingRef.current = true;
@@ -655,7 +659,7 @@ export function WorkGroupCard({
         isUpdatingRef.current = false;
       });
     }
-  }, [groupTotalCost, summary.totalCost, updateSummary, summary]);
+  }, [groupTotalCost, summary.totalCost, updateSummary, summary, loadingItems, groupItems.length]);
 
   const handleToggleExcludeGroup = async () => {
     const newExcludedState = !summary.isExcluded;

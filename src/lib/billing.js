@@ -29,10 +29,11 @@ export async function recomputeSummaryCost(summaryId) {
 
     const allItems = await getAllFromDB('summaryItems');
     const totalBaseCost = allItems
-      .filter(i => i.summaryId === summaryId && !i.isExcluded)
+      .filter(i => (i.summaryId === summaryId || i.scheduleSummaryId === summaryId) && !i.isExcluded)
       .reduce((sum, i) => sum + (i.totalCost || 0), 0);
 
-    const sched = await getFromDB('schedulesOfWork', summary.scheduleOfWorkId);
+    const schedId = summary.scheduleOfWorkId || summary.scheduleId;
+    const sched = schedId ? await getFromDB('schedulesOfWork', schedId) : null;
     const project = sched ? await getFromDB('projects', sched.projectId) : null;
 
     const isLaborType = summary.type === 'labor';
@@ -65,7 +66,9 @@ export async function recomputeSummaryCost(summaryId) {
 
     await saveAndNotify('scheduleSummaries', { ...summary, totalCost: groupTotalCost });
 
-    await recomputeScheduleCost(summary.scheduleOfWorkId);
+    if (schedId) {
+      await recomputeScheduleCost(schedId);
+    }
   } catch (err) {
     console.error('[Billing] recomputeSummaryCost failed:', err);
   }
@@ -80,7 +83,7 @@ export async function recomputeScheduleCost(scheduleId) {
     // 1. Sum up all summaries directly attached to this schedule
     const allSummaries = await getAllFromDB('scheduleSummaries');
     const ownSummariesTotal = allSummaries
-      .filter(s => s.scheduleOfWorkId === scheduleId && !s.isExcluded)
+      .filter(s => (s.scheduleOfWorkId === scheduleId || s.scheduleId === scheduleId) && !s.isExcluded)
       .reduce((sum, s) => sum + (s.totalCost || 0), 0);
 
     const allSchedules = await getAllFromDB('schedulesOfWork');

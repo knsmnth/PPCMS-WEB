@@ -79,7 +79,7 @@ const C = {
 
 // ─── Column widths ────────────────────────────────────────────────────────────
 // 11 cols: scope | qty | unit | unit-cost | unit-total | mat-total | labor | equip | ocm | group-total | schedule-total
-const COLS = ['30%', '4%', '4%', '6%', '6%', '7%', '7%', '6%', '7%', '9%', '9%'];
+const COLS = ['29%', '4%', '5%', '6%', '6%', '7%', '7%', '6%', '7%', '9%', '9%'];
 
 // ─── Colgroup ─────────────────────────────────────────────────────────────────
 function Colgroup() {
@@ -164,14 +164,22 @@ function ScheduleGroup({ entry, allSummaries, allItems, project, materials }) {
     overflow: 'hidden',
   };
   const groupNumTd = { ...groupTd, textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden' };
-  const schedIndent = level === 1 ? { paddingLeft: 24 } : {};
+  const schedPaddingLeft = level === 1 ? 28 : 6;
+  const schedPrefixMinWidth = level === 1 ? '24px' : '18px';
+  const groupPaddingLeft = level === 1 ? 56 : 28;
+  const groupPrefixMinWidth = '16px';
+  const itemPaddingLeft = level === 1 ? 76 : 48;
+  const itemNumberMinWidth = '16px';
 
   return (
     <>
       {/* ── Schedule header row: name spans left, total at far right ── */}
       <tr className="row-group">
-        <td style={{ ...schedTd, ...schedIndent, borderLeft: 'none', borderRight: 'none' }}>
-          <span style={{ display: 'inline-block', minWidth: '16px', paddingRight: '6px' }}>{labelPrefix}</span>{schedule.name}
+        <td style={{ ...schedTd, paddingLeft: schedPaddingLeft, borderLeft: 'none', borderRight: 'none' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
+            <span style={{ flexShrink: 0, minWidth: schedPrefixMinWidth }}>{labelPrefix}</span>
+            <span style={{ flex: 1, minWidth: 0 }}>{schedule.name}</span>
+          </div>
         </td>
         {/* blank cols 2-10 merged */}
         <td colSpan={9} style={{ ...schedTd, borderLeft: 'none', borderRight: 'none' }} />
@@ -194,8 +202,11 @@ function ScheduleGroup({ entry, allSummaries, allItems, project, materials }) {
           <React.Fragment key={summary.id}>
             {/* Work-group header row */}
             <tr className="row-group">
-              <td style={{ ...groupTd, paddingLeft: level === 1 ? 40 : 24, borderLeft: 'none', borderRight: 'none' }}>
-                <span style={{ display: 'inline-block', minWidth: '16px', paddingRight: '6px' }}>{groupLabel}</span>{summary.name}
+              <td style={{ ...groupTd, paddingLeft: groupPaddingLeft, borderLeft: 'none', borderRight: 'none' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
+                  <span style={{ flexShrink: 0, minWidth: groupPrefixMinWidth }}>{groupLabel}</span>
+                  <span style={{ flex: 1, minWidth: 0 }}>{summary.name}</span>
+                </div>
               </td>
               <td style={{ ...groupTd, borderLeft: 'none', borderRight: 'none' }} />
               <td style={{ ...groupTd, borderLeft: 'none', borderRight: 'none' }} />
@@ -231,11 +242,23 @@ function ScheduleGroup({ entry, allSummaries, allItems, project, materials }) {
               const displayName = mat?.specs || mat?.description || item.name;
               return (
                 <tr key={item.id} className="row-group">
-                  <td style={{ ...td, paddingLeft: 40, borderLeft: 'none', borderRight: 'none' }}>
-                    <span style={{ display: 'inline-block', width: '16px', textAlign: 'right', marginRight: '6px' }}>{idx + 1}</span>{displayName}
+                  <td style={{ ...td, paddingLeft: itemPaddingLeft, borderLeft: 'none', borderRight: 'none' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
+                      <span style={{ flexShrink: 0, minWidth: itemNumberMinWidth, textAlign: 'left' }}>{idx + 1}</span>
+                      <span style={{ flex: 1, minWidth: 0 }}>{displayName}</span>
+                    </div>
                   </td>
                   <td style={{ ...td, textAlign: 'center', borderLeft: 'none', borderRight: 'none' }}>{item.quantity ?? ''}</td>
-                  <td style={{ ...td, textAlign: 'center', fontStyle: 'italic', borderLeft: 'none' }}>
+                  <td style={{
+                    ...td,
+                    textAlign: 'center',
+                    fontStyle: 'italic',
+                    fontSize: item.duration ? '5.2pt' : '5.8pt',
+                    lineHeight: 1.15,
+                    padding: '2px 2px',
+                    borderLeft: 'none',
+                    whiteSpace: 'normal',
+                  }}>
                     {item.duration ? `${item.unit ?? ''}/${item.duration} day${Number(item.duration) > 1 ? 's' : ''}` : (item.unit ?? '')}
                   </td>
                   <td style={ndTd}>{item.unitCostAtTimeOfAdding != null ? formatNumber(item.unitCostAtTimeOfAdding) : ''}</td>

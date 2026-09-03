@@ -258,9 +258,9 @@ function EditWorkDialog({ open, onOpenChange, work, onSubmit }) {
 
 // ─── WorkRow & WorkGroup ──────────────────────────────────────────────────
 
-function WorkGroup({
+export function WorkGroup({
   mainWork,
-  subWorks,
+  subWorks = [],
   selectMode,
   selectedWorkIds,
   onToggleSelect,
@@ -279,7 +279,7 @@ function WorkGroup({
   onCreateSub,
   onPromote
 }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const hasSubs = subWorks.length > 0;
 
   return (
@@ -372,9 +372,8 @@ function WorkRow({
 
   return (
     <TableRow
-      draggable
+      draggable={true}
       style={{
-        cursor: 'pointer',
         backgroundColor: isAttachTarget
           ? 'rgba(34, 197, 94, 0.14)'
           : isSelected
@@ -383,11 +382,13 @@ function WorkRow({
           ? '#f8fafc'
           : 'white',
         borderLeft: isSub ? '4px solid #0284c7' : '4px solid transparent',
-        borderTop: dropPos === 'before' ? '3px solid #2563eb' : undefined,
-        borderBottom: dropPos === 'after' ? '3px solid #2563eb' : undefined,
         boxShadow: isAttachTarget
           ? 'inset 0 0 0 2px #16a34a'
-          : '',
+          : dropPos === 'before'
+          ? 'inset 0 3px 0 0 #2563eb'
+          : dropPos === 'after'
+          ? 'inset 0 -3px 0 0 #2563eb'
+          : undefined,
         opacity: work.isExcluded ? 0.6 : 1,
         transition: 'background-color 0.15s ease, box-shadow 0.15s ease',
       }}
@@ -425,15 +426,18 @@ function WorkRow({
         onDragOver();
       }}
       onDragLeave={e => {
-        if (dragOverTarget?.id === work.id) {
-          setDragOverTarget(null);
+        if (!e.currentTarget.contains(e.relatedTarget)) {
+          if (dragOverTarget?.id === work.id) {
+            setDragOverTarget(null);
+          }
         }
       }}
       onDrop={e => {
         e.preventDefault();
-        const finalPos = isOverThis ? dragOverTarget.position : 'after';
+        const finalPos = isOverThis ? (dragOverTarget?.position || 'after') : 'after';
         setDragOverTarget(null);
-        onDrop(work.id, work.parentId, finalPos);
+        const transferredId = e.dataTransfer.getData('text/plain') || work.id;
+        onDrop(work.id, work.parentId, finalPos, transferredId);
       }}
       onDragEnd={e => {
         e.currentTarget.style.opacity = '1';
@@ -441,18 +445,22 @@ function WorkRow({
         setDragOverTarget(null);
         onDragEnd();
       }}
-      onClick={() => { if (Date.now() - lastDragEnd.current < 300) return; onNavigate(work.id); }}
     >
       {/* ── Column 1: MOVE (Reorder Grip & Expand Chevron) ── */}
-      <TableCell style={{ width: 54, minWidth: 54, maxWidth: 54, textAlign: 'center', padding: '0.75rem 0.25rem 0.75rem 0.75rem' }}>
+      <TableCell style={{ width: 54, minWidth: 54, maxWidth: 54, textAlign: 'center', padding: '0.75rem 0.25rem 0.75rem 0.75rem' }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.15rem' }}>
-          <span
-            style={{ cursor: 'grab', color: '#a1a1aa', display: 'flex', alignItems: 'center', userSelect: 'none' }}
-            title={isSub ? "Drag to reorder sub-projects or drag to top banner to promote to Main Project" : "Drag top/bottom to reorder, or center to attach as sub-project"}
-            onClick={e => e.stopPropagation()}
+          <div
+            draggable={true}
+            onDragStart={e => {
+              e.dataTransfer.effectAllowed = 'move';
+              e.dataTransfer.setData('text/plain', work.id);
+              onDragStart(work.id, work.parentId);
+            }}
+            style={{ cursor: 'grab', color: '#a1a1aa', display: 'flex', alignItems: 'center', userSelect: 'none', padding: '2px' }}
+            title={isSub ? "Drag to reorder sub-projects under this main work" : "Drag to reorder main works, or center to attach as sub-project"}
           >
             <GripVertical size={16} />
-          </span>
+          </div>
 
           {!isSub && hasSubs ? (
             <button
@@ -497,8 +505,11 @@ function WorkRow({
         </TableCell>
       )}
 
-      {/* ── Column 4: Work Name & Tags ── */}
-      <TableCell style={{ paddingLeft: '0.5rem' }}>
+      {/* ── Column 4: Work Name & Tags (CLICKABLE TO OPEN DETAILS) ── */}
+      <TableCell
+        style={{ paddingLeft: '0.5rem', cursor: 'pointer' }}
+        onClick={() => { if (Date.now() - lastDragEnd.current < 300) return; onNavigate(work.id); }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           <span style={{
             fontWeight: isSub ? 600 : 750,
@@ -532,15 +543,21 @@ function WorkRow({
         </div>
       </TableCell>
 
-      {/* ── Column 5: Specifications ── */}
-      <TableCell>
+      {/* ── Column 5: Specifications (CLICKABLE TO OPEN DETAILS) ── */}
+      <TableCell
+        style={{ cursor: 'pointer' }}
+        onClick={() => { if (Date.now() - lastDragEnd.current < 300) return; onNavigate(work.id); }}
+      >
         <div style={{ fontSize: '0.82rem', color: '#52525b', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
           {work.description || '—'}
         </div>
       </TableCell>
 
-      {/* ── Column 6: Work Code ── */}
-      <TableCell style={{ textAlign: 'center', width: 145 }}>
+      {/* ── Column 6: Work Code (CLICKABLE TO OPEN DETAILS) ── */}
+      <TableCell
+        style={{ textAlign: 'center', width: 145, cursor: 'pointer' }}
+        onClick={() => { if (Date.now() - lastDragEnd.current < 300) return; onNavigate(work.id); }}
+      >
         {isSub ? (
           <span style={{
             fontWeight: 700,
@@ -562,16 +579,20 @@ function WorkRow({
         )}
       </TableCell>
 
-      {/* ── Column 7: Cost ── */}
-      <TableCell style={{
-        textAlign: 'right',
-        width: 160,
-        fontWeight: isSub ? 600 : 750,
-        fontSize: isSub ? '0.92rem' : '1rem',
-        color: work.isExcluded ? 'var(--muted-foreground)' : (isSub ? '#334155' : 'var(--foreground)'),
-        paddingRight: '1.5rem',
-        textDecoration: work.isExcluded ? 'line-through' : 'none'
-      }}>
+      {/* ── Column 7: Cost (CLICKABLE TO OPEN DETAILS) ── */}
+      <TableCell
+        style={{
+          textAlign: 'right',
+          width: 160,
+          fontWeight: isSub ? 600 : 750,
+          fontSize: isSub ? '0.92rem' : '1rem',
+          color: work.isExcluded ? 'var(--muted-foreground)' : (isSub ? '#334155' : 'var(--foreground)'),
+          paddingRight: '1.5rem',
+          textDecoration: work.isExcluded ? 'line-through' : 'none',
+          cursor: 'pointer'
+        }}
+        onClick={() => { if (Date.now() - lastDragEnd.current < 300) return; onNavigate(work.id); }}
+      >
         ₱{(work.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
       </TableCell>
 
@@ -837,11 +858,13 @@ export default function ProgramOfWorks() {
 
   const handleCreate = useCallback(async ({ name, description }) => {
     if (!projectId) return;
+    const newId = crypto.randomUUID();
     const isSub = !!createParentId;
     const siblings = worksRef.current.filter(w => isSub ? w.parentId === createParentId : !w.parentId);
     const tempOrder = siblings.reduce((m, w) => Math.max(m, w.order ?? 0), -1) + 1;
 
     const newWork = {
+      id: newId,
       projectId,
       name,
       description: description || '',
@@ -853,14 +876,25 @@ export default function ProgramOfWorks() {
       createdAt: new Date().toISOString(),
     };
 
-    const created = await createWorkDirect(newWork);
-    const allAfter = [...worksRef.current, { ...newWork, id: created?.id || crypto.randomUUID() }];
-    const codeUpdates = computeWorkCodeUpdates(allAfter, projectCodeRef.current);
-    if (codeUpdates.length) await Promise.all(codeUpdates.map(u => updateItem(u)));
+    const allAfter = [...worksRef.current, newWork];
+    const codeUpdates = computeWorkCodeUpdates(allAfter.filter(w => w.projectId === projectId), projectCodeRef.current);
+    const myCodeUpdate = codeUpdates.find(u => u.id === newId);
+    if (myCodeUpdate) {
+      newWork.workCode = myCodeUpdate.workCode;
+      newWork.order = myCodeUpdate.order;
+    }
+
+    await createWorkDirect(newWork);
+
+    const otherUpdates = codeUpdates.filter(u => u.id !== newId);
+    if (otherUpdates.length) {
+      await Promise.all(otherUpdates.map(u => updateItem(u)));
+    }
 
     setCreateOpen(false);
     setCreateParentId(null);
-  }, [projectId, createWorkDirect, createParentId, updateItem]);
+    refresh();
+  }, [projectId, createParentId, createWorkDirect, updateItem, refresh]);
 
   const handleEdit = useCallback(async ({ name, description }) => {
     if (!editingWork) return;
@@ -995,10 +1029,10 @@ export default function ProgramOfWorks() {
 
   const handleDragOver = useCallback(() => {}, []);
 
-  const handleDrop = useCallback(async (targetId, targetParentId, dropPosition = 'after') => {
+  const handleDrop = useCallback(async (targetId, targetParentId, dropPosition = 'after', explicitFromId = null) => {
     stopAutoScroll();
-    const fromId = draggingIdx.current;
-    const fromParentId = draggingParentId.current;
+    const fromId = explicitFromId || draggingIdx.current || draggingInfo?.id;
+    const fromParentId = draggingParentId.current || draggingInfo?.parentId;
     draggingIdx.current = null;
     draggingParentId.current = null;
     setDraggingInfo({ id: null, parentId: null });

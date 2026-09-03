@@ -134,10 +134,15 @@ export function useCollection(collectionName, queryConstraints = [], pageLimit =
   };
 
   const createItem = async (payload) => {
-    const newItem = { ...payload, createdAt: new Date().toISOString() };
+    const newItem = {
+      id: payload.id || crypto.randomUUID(),
+      ...payload,
+      createdAt: new Date().toISOString(),
+    };
     await putToDB(collectionName, newItem);
     await addToSyncQueue({ type: 'create', collection: collectionName, payload: newItem });
     notifyUpdate();
+    return newItem;
   };
 
   const updateItem = async (payload) => {
